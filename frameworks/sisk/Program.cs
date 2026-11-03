@@ -1,0 +1,200 @@
+using System.Diagnostics;
+using System.Net.Http.Json;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
+using Npgsql;
+using sisk;
+using Sisk.Cadente.CoreEngine;
+using Sisk.Core.Http;
+using Sisk.Core.Http.FileSystem;
+using Sisk.Core.Routing;
+
+var server = HttpServer.CreateBuilder ()
+                       .UseEngine<CadenteHttpServerEngine> ()
+                       .UseListeningPort ( new ListeningPort ( false, "0.0.0.0", 8080 ) )
+                       .UseMinimalConfiguration ()
+                       .UseConfiguration ( config => {
+                           config.EnableAutomaticResponseCompression = true;
+                       } );
+
+
+// Sisk binds a Router to one listening host, and Cadente applies TLS per host
+// rather than per port, so json-tls needs a second host with its own Router.
+// This is the single definition both hosts are built from -- neither port can
+// drift from the other.
+Router BuildRouter () {
+    Router router = new Router ();
+
+    var staticRoute = HttpFileServer.CreateServingRoute ( "/static", new HttpFileServerHandler () {
+        RootDirectoryPath = "/data/static",
+        AllowDirectoryListing = false
+    } );
+
+    router.SetRoute ( staticRoute );
+
+    router.MapGet ( "/baseline11", r => new HttpResponse ( Sum ( r ) ) );
+    router.MapPost ( "/baseline11", r => new HttpResponse ( Sum ( r ) ) );
+
+    router.MapGet ( "/baseline2", r => new HttpResponse ( Sum ( r ) ) );
+
+    router.MapGet ( "/pipeline", r => new HttpResponse ( "ok" ) );
+
+    router.MapGet ( "/delay/<ms>", async ( HttpRequest r ) => {
+        int ms = int.Parse ( r.RouteParameters [ "ms" ].GetString () );
+        // Task.Delay registers a timer and yields; the thread goes back to the pool rather than
+        // sitting on the request, so the waits in flight are bounded by memory.
+        if (ms > 0) await Task.Delay ( ms );
+        return new HttpResponse ( ms.ToString () );
+    } );
+
+    router.MapPost ( "/echo", r => {
+        // sisk has already read the body, chunked or not.
+        var body = r.GetBodyContents ();
+        var content = new ByteArrayContent ( body );
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue ( "application/octet-stream" );
+        return new HttpResponse ( content );
+    } );
+
+    var datasetItems = LoadItems ();
+
+    router.MapGet ( "/json/<count>", r => {
+        int count = Math.Clamp ( int.Parse ( r.RouteParameters [ "count" ].GetString () ), 0, datasetItems!.Count );
+        int m = 1;
+        if (r.Query.TryGetValue ( "m", out var mStr )) { int.TryParse ( mStr, out m ); if (m == 0) m = 1; }
+        var processed = new ProcessedItem [ count ];
+
+        for (int i = 0; i < count; i++) {
+            var d = datasetItems [ i ];
+            processed [ i ] = new ProcessedItem {
+                Id = d.Id,
+                Name = d.Name,
+                Category = d.Category,
+                Price = d.Price,
+                Quantity = d.Quantity,
+                Active = d.Active,
+                Tags = d.Tags,
+                Rating = d.Rating,
+                Total = d.Price * d.Quantity * m
+            };
+        }
+
+        return new HttpResponse {
+            Content = JsonContent.Create ( new ListWithCount<ProcessedItem> ( processed.ToList () ) )
+        };
+    } );
+
+    var pgDataSource = OpenPgPool ();
+
+    router.MapGet ( "/async-db", async ( HttpRequest request ) => {
+        var min = request.Query.TryGetValue ( "min", out var vmin ) ? vmin.GetInteger () : 10;
+        var max = request.Query.TryGetValue ( "max", out var vmax ) ? vmax.GetInteger () : 50;
+        var limit = request.Query.TryGetValue ( "limit", out var vlim ) ? Math.Clamp ( vlim.GetInteger (), 1, 50 ) : 50;
+
+        Debug.Assert ( pgDataSource != null, "PostgreSQL data source is not available. Please set the DATABASE_URL environment variable." );
+
+        await using var cmd = pgDataSource.CreateCommand (
+            "SELECT id, name, category, price, quantity, active, tags, rating_score, rating_count FROM items WHERE price BETWEEN $1 AND $2 LIMIT $3" );
+
+        cmd.Parameters.AddWithValue ( min );
+        cmd.Parameters.AddWithValue ( max );
+        cmd.Parameters.AddWithValue ( limit );
+        await using var reader = await cmd.ExecuteReaderAsync ();
+
+        var items = new List<object> ();
+
+        while (await reader.ReadAsync ()) {
+            items.Add ( new {
+                id = reader.GetInt32 ( 0 ),
+                name = reader.GetString ( 1 ),
+                category = reader.GetString ( 2 ),
+                price = reader.GetInt32 ( 3 ),
+                quantity = reader.GetInt32 ( 4 ),
+                active = reader.GetBoolean ( 5 ),
+                tags = JsonSerializer.Deserialize<List<string>> ( reader.GetString ( 6 ) ),
+                rating = new { score = reader.GetInt32 ( 7 ), count = reader.GetInt32 ( 8 ) },
+            } );
+        }
+
+        return new HttpResponse {
+            Content = JsonContent.Create ( new ListWithCount<object> ( items ) )
+        };
+    } );
+
+    return router;
+}
+
+server.UseRouter ( BuildRouter () );
+
+// json-tls on 8081. Cadente applies the certificate to the whole listening host
+// rather than to individual ports -- setting SslOptions (or calling UseSsl) on
+// the plaintext host turns 8080 into HTTPS too and it starts 301-ing plaintext
+// to https. So TLS runs as its own server with its own Router built from the
+// same BuildRouter(). The harness only mounts /certs for the TLS profiles, so
+// without them the second server is never created.
+if (File.Exists ( "/certs/server.crt" ) && File.Exists ( "/certs/server.key" )) {
+    // A CreateFromPemFile certificate carries its key ephemerally, which
+    // SslStream will not accept, so it is round-tripped through PKCS12.
+    using var pem = X509Certificate2.CreateFromPemFile ( "/certs/server.crt", "/certs/server.key" );
+    var tlsCertificate = X509CertificateLoader.LoadPkcs12 ( pem.Export ( X509ContentType.Pkcs12 ), null );
+
+    var tlsServer = HttpServer.CreateBuilder ()
+                              .UseEngine<CadenteHttpServerEngine> ()
+                              .UseListeningPort ( new ListeningPort ( true, "0.0.0.0", 8081 ) )
+                              .UseMinimalConfiguration ()
+                              .UseConfiguration ( config => {
+                                  config.EnableAutomaticResponseCompression = true;
+                              } )
+                              .UseSsl ( tlsCertificate )
+                              .UseRouter ( BuildRouter () );
+
+    _ = tlsServer.Build ().StartAsync ();
+}
+
+await server.Build ().StartAsync ();
+
+return;
+
+static string Sum ( HttpRequest request ) {
+    var a = request.Query [ "a" ].MaybeNullOrEmpty ()?.GetInteger () ?? 0;
+    var b = request.Query [ "b" ].MaybeNullOrEmpty ()?.GetInteger () ?? 0;
+
+    var c = 0;
+
+    if (request.Method == HttpMethod.Post) {
+        c = int.Parse ( request.Body );
+    }
+
+    return (a + b + c).ToString ();
+}
+
+static List<DatasetItem>? LoadItems () {
+    var jsonOptions = new JsonSerializerOptions {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    var datasetPath = Environment.GetEnvironmentVariable ( "DATASET_PATH" ) ?? "/data/dataset.json";
+
+    if (File.Exists ( datasetPath )) {
+        return JsonSerializer.Deserialize<List<DatasetItem>> ( File.ReadAllText ( datasetPath ), jsonOptions );
+    }
+
+    return null;
+}
+
+static NpgsqlDataSource? OpenPgPool () {
+    var dbUrl = Environment.GetEnvironmentVariable ( "DATABASE_URL" );
+    if (string.IsNullOrEmpty ( dbUrl ))
+        return null;
+    try {
+        var uri = new Uri ( dbUrl );
+        var userInfo = uri.UserInfo.Split ( ':' );
+        var connStr = $"Host={uri.Host};Port={uri.Port};Username={userInfo [ 0 ]};Password={userInfo [ 1 ]};Database={uri.AbsolutePath.TrimStart ( '/' )};Maximum Pool Size=256;Minimum Pool Size=64;Multiplexing=true;No Reset On Close=true;Max Auto Prepare=4;Auto Prepare Min Usages=1";
+        var builder = new NpgsqlDataSourceBuilder ( connStr );
+        return builder.Build ();
+    }
+    catch {
+        return null;
+    }
+}
+

@@ -1,0 +1,109 @@
+<?php
+
+require __DIR__ . '/Pgsql.php';
+require __DIR__ . '/Crud.php';
+require __DIR__ . '/Fortunes.php';
+require __DIR__ . '/data.php';
+
+$path = $_SERVER['PATH_INFO'];
+
+return match ($path) {
+    '/baseline11' => baseline(),
+    '/baseline2'  => baseline(),
+    '/echo'       => echo_body(),
+    '/pipeline'   => pipeline(),
+    '/async-db'   => asyncDb(),
+    '/fortunes'   => Fortunes::render(),
+
+    default => rest($path)
+};
+
+function rest($path)
+{
+    return match (true) {
+        str_starts_with($path, '/json/') => json($path),
+        str_starts_with($path, '/delay/') => delay($path),
+
+        // /crud/items and /crud/items/{id}, split by method the way the profile
+        // asks: list and cache-aside read on GET, upsert on POST, update on PUT.
+        $path === '/crud/items' => $_SERVER['REQUEST_METHOD'] === 'POST'
+            ? Crud::create()
+            : Crud::list(),
+
+        str_starts_with($path, '/crud/items/') => $_SERVER['REQUEST_METHOD'] === 'PUT'
+            ? Crud::update((int) substr($path, 12))
+            : Crud::read((int) substr($path, 12)),
+
+        default => notFound()
+    };
+}
+
+function baseline()
+{
+    $sum = array_sum($_GET);
+    if($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $sum += file_get_contents('php://input');
+    }
+
+    header('Content-Type: text/plain');
+    echo $sum;
+}
+
+function json($path)
+{
+    $count = explode('/', $path)[2];
+    $m = $_GET['m'] ?? 1;
+    $total = [];
+    $i = 0;
+    while ($i < $count) {
+        $item = JSON_DATA[$i++];
+        $item['total'] = $item['price'] * $item['quantity'] * $m;
+        $total[] = $item;
+    }
+    header('Content-Type: application/json');
+    echo json_encode(['items' => $total, 'count' => $count], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}
+
+function echo_body()
+{
+    // php://input is the raw request body, read to end regardless of framing,
+    // so a chunked request works without a Content-Length to size it from.
+    header('Content-Type: application/octet-stream');
+    echo file_get_contents('php://input');
+}
+
+// The wait holds the worker: that is what a synchronous PHP stack does, and what the profile
+// is measuring for one.
+function delay($path)
+{
+    $ms = (int) substr($path, 7);
+
+    if ($ms > 0) {
+        usleep($ms * 1000);
+    }
+
+    header('Content-Type: text/plain');
+    echo $ms;
+}
+
+function pipeline()
+{
+    header('Content-Type: text/plain');
+    echo 'ok';
+}
+
+function asyncDb()
+{
+    header('Content-Type: application/json');
+    echo Pgsql::query(
+        $_GET['min'] ?? 10,
+        $_GET['max'] ?? 50,
+        $_GET['limit'] ?? 50
+    );
+}
+
+function notFound()
+{
+    header('Content-Type: text/plain', true, 404);
+    echo 'Not Found';
+}

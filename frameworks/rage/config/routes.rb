@@ -1,0 +1,21 @@
+Rage.routes.draw do
+  get  '/pipeline', to: ->(env) do
+    [200, {
+      'content-type' => 'text/plain'
+    }, ['ok']]
+  end
+  get  '/delay/:ms',      to: 'benchmark#delay'
+  get  '/baseline11',     to: 'benchmark#baseline_one'
+  post '/baseline11',     to: 'benchmark#baseline_one'
+  get  '/baseline2',      to: 'benchmark#baseline_two'
+  get  '/json/:count',    to: 'benchmark#json_endpoint'
+  get  '/async-db',       to: 'benchmark#async_db'
+  post '/echo',           to: 'benchmark#echo_body'
+  get  '/crud/items',     to: 'items#index'
+  get  '/crud/items/:id', to: "items#show"
+  post '/crud/items',     to: 'items#create'
+  put  '/crud/items/:id', to: 'items#update'
+
+  # Catch-all for unknown paths → 404
+  get '*', to: 'benchmark#not_found'
+end

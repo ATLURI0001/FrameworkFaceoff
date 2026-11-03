@@ -1,0 +1,21 @@
+[package]
+name = "httparena-hyper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hyper = { version = "1", features = ["server", "http1", "http2"], default-features = false }
+hyper-util = { version = "0.1", features = ["http1", "http2", "server", "service", "tokio"] }
+http-body-util = "0.1"
+http = "1"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rustls-pemfile = "2"
+socket2 = { version = "0.5", features = ["all"] }
+num_cpus = "1"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true

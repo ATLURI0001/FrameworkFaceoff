@@ -1,0 +1,28 @@
+{
+  "display_name": "hono-bun",
+  "language": "TS",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "jsc",
+  "description": "Ultrafast Web Standards framework running natively on Bun \u2014 no adapter overhead.",
+  "repo": "https://github.com/honojs/hono",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "static-tls",
+    "async-db",
+    "fortunes"
+  ],
+  "maintainers": []
+}

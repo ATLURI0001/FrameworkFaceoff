@@ -1,0 +1,28 @@
+{
+  "display_name": "fletch",
+  "language": "Dart",
+  "engine": "dart:io",
+  "type": "emerging",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "description": "Express-inspired HTTP framework for Dart with radix-tree routing, middleware chains, signed sessions, and built-in DI.",
+  "repo": "https://github.com/kartikey321/fletch",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db"
+  ],
+  "maintainers": [
+    "kartikey321"
+  ]
+}

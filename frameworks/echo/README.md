@@ -1,0 +1,39 @@
+# echo
+
+Echo v4 on the Go `net/http` server, default configuration.
+
+## Stack
+
+- **Language:** Go 1.26
+- **Framework:** Echo v4
+- **Build:** `golang:1.26-alpine` -> `alpine:3.23` runtime
+
+## Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/pipeline` | GET | Returns `ok` (plain text) |
+| `/baseline11` | GET | Sums query parameter values |
+| `/baseline11` | POST | Sums query parameters + request body |
+| `/json/{count}?m=N` | GET | First `count` dataset items with `total = price * quantity * m` |
+| `/echo` | POST | Returns the request body back verbatim |
+
+## Notes
+
+- Routing and path parameters through the Echo router, JSON through `c.JSON`
+- Compression through the Echo `Gzip` middleware
+- Banner and port log disabled, no other middleware installed
+
+## Added profiles
+
+`static`, `static-tls`, `json-tls`, `async-db` and `crud`.
+
+- `json-tls` and `static-tls` listen on `8081` when `/certs/server.crt` and `/certs/server.key`
+  are mounted; it is the same router behind TLS, not a second copy of the handlers.
+- Static file bodies are read from disk on every request, which the static profiles require in
+  every mode. Standard mode leaves the encoding to the compression middleware rather than
+  serving a pre-compressed sibling.
+- Postgres goes through `pgx`. One process here, so the whole `DATABASE_MAX_CONN` budget is
+  available, less headroom for `superuser_reserved_connections`.
+- `crud` runs cache-aside on Redis with a 200ms TTL and an explicit delete on update.
+- `tags` is a JSONB column, so it comes back as bytes rather than a Go slice.

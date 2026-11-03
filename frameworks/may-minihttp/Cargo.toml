@@ -1,0 +1,16 @@
+[package]
+name = "httparena-may-minihttp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+may = "0.3"
+httparse = "1"
+num_cpus = "1"
+mimalloc = { version = "0.1", default-features = false }
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "thin"
+panic = "abort"

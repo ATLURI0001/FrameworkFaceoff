@@ -1,0 +1,38 @@
+{
+  "display_name": "neton",
+  "language": "Kotlin",
+  "engine": "netonstream",
+  "type": "emerging",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "description": "Neton with the Kotlin/Native neton-http-netonstream adapter, using com.netonstream io/http/tls and OpenSSL. The same framework routes, middleware, request parsing and response pipeline as neton-hyper; only the engine differs. HTTP/1.1 on 8080, h2c on 8082, h1 TLS on 8081 and h2 TLS on 8443.",
+  "repo": "https://github.com/netonframework/neton",
+  "enabled": true,
+  "tests": [
+    "baseline",
+    "limited-conn",
+    "pipelined",
+    "async",
+    "latency-1m",
+    "latency-10k",
+    "latency-500k-8cpu",
+    "baseline-h2c",
+    "json-h2c",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "static-tls",
+    "baseline-h2",
+    "static-h2",
+    "async-db",
+    "fortunes"
+  ],
+  "maintainers": [
+    "zoujiaqing"
+  ]
+}

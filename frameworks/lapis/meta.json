@@ -1,0 +1,25 @@
+{
+  "display_name": "lapis",
+  "language": "Lua",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "OpenResty",
+  "description": "Lapis on OpenResty with LuaJIT, one nginx worker per core. Routing and params through the Lapis application API, cjson serialization, gzip through the nginx gzip directive.",
+  "repo": "https://github.com/leafo/lapis",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-tls",
+    "json-comp",
+    "8gbit"
+  ],
+  "maintainers": []
+}

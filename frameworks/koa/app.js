@@ -1,0 +1,125 @@
+const cluster = require('cluster');
+const https = require('node:https');
+const os = require('os');
+
+function getCPUCount() {
+    try {
+        const max = require('fs').readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim();
+        const [quota, period] = max.split(' ');
+        if (quota !== 'max') {
+            const cgroup = Math.floor(Number(quota) / Number(period));
+            if (cgroup >= 1) return cgroup;
+        }
+    } catch {}
+    return os.availableParallelism ? os.availableParallelism() : os.cpus().length;
+}
+
+if (cluster.isPrimary) {
+    const numCPUs = getCPUCount();
+    for (let i = 0; i < numCPUs; i++) cluster.fork();
+} else {
+    const fs = require('fs');
+    const Koa = require('koa');
+    const Router = require('@koa/router');
+    const compress = require('koa-compress');
+
+    const app = new Koa();
+    const router = new Router();
+
+    let datasetItems = [];
+    try {
+        datasetItems = JSON.parse(fs.readFileSync(process.env.DATASET_PATH || '/data/dataset.json', 'utf8'));
+    } catch (e) {}
+
+    // standard mode: compression is the stock koa-compress middleware with its defaults
+    app.use(compress());
+
+    function sumQuery(query) {
+        let sum = 0;
+        for (const key in query) {
+            const n = parseInt(query[key], 10);
+            if (n === n) sum += n;
+        }
+        return sum;
+    }
+
+    function readBody(req) {
+        return new Promise((resolve, reject) => {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => resolve(body));
+            req.on('error', reject);
+        });
+    }
+
+    router.get('/pipeline', ctx => {
+        ctx.type = 'text/plain';
+        ctx.body = 'ok';
+    });
+
+    // A promise-based sleep yields to the event loop rather than holding it, so the waits in
+    // flight are bounded by memory.
+    router.get('/delay/:ms', async ctx => {
+        const ms = Number.parseInt(ctx.params.ms, 10);
+        if (!Number.isInteger(ms) || ms < 0) {
+            ctx.status = 404;
+            return;
+        }
+        if (ms > 0) {
+            await new Promise(resolve => setTimeout(resolve, ms));
+        }
+        ctx.type = 'text/plain';
+        ctx.body = String(ms);
+    });
+
+    async function baseline11(ctx) {
+        let total = sumQuery(ctx.query);
+        if (ctx.method === 'POST') {
+            const n = parseInt((await readBody(ctx.req)).trim(), 10);
+            if (n === n) total += n;
+        }
+        ctx.type = 'text/plain';
+        ctx.body = String(total);
+    }
+
+    router.get('/baseline11', baseline11);
+    router.post('/baseline11', baseline11);
+
+    router.get('/json/:count', ctx => {
+        let count = parseInt(ctx.params.count, 10) || 0;
+        if (count < 0) count = 0;
+        if (count > datasetItems.length) count = datasetItems.length;
+        const m = parseInt(ctx.query.m, 10) || 1;
+        const items = datasetItems.slice(0, count).map(d => ({
+            id: d.id, name: d.name, category: d.category,
+            price: d.price, quantity: d.quantity, active: d.active,
+            tags: d.tags, rating: d.rating,
+            total: d.price * d.quantity * m
+        }));
+        ctx.body = { items, count };
+    });
+
+    router.post('/echo', async ctx => {
+        const chunks = [];
+        for await (const chunk of ctx.req) chunks.push(chunk);
+        ctx.type = 'application/octet-stream';
+        ctx.body = Buffer.concat(chunks);
+    });
+
+    app.use(router.routes());
+    app.listen(8080);
+
+    // json-tls on 8081: the same app, behind a TLS server. app.callback() is the
+    // node request handler Koa already builds for its own listen(), so this is
+    // the same middleware chain rather than a second copy. Every worker binds it
+    // as they all bind 8080. The harness only mounts /certs for the TLS
+    // profiles, so without them it is not opened.
+    const cert = '/certs/server.crt';
+    const key = '/certs/server.key';
+    if (fs.existsSync(cert) && fs.existsSync(key)) {
+        https.createServer(
+            { key: fs.readFileSync(key), cert: fs.readFileSync(cert) },
+            app.callback()
+        ).listen(8081);
+    }
+}

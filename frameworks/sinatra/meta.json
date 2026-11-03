@@ -1,0 +1,32 @@
+{
+  "display_name": "sinatra",
+  "language": "Ruby",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "puma",
+  "description": "Sinatra DSL web framework on Puma, multi-threaded with one worker per CPU core.",
+  "repo": "https://github.com/sinatra/sinatra",
+  "enabled": true,
+  "tests": [
+    "baseline",
+    "async",
+    "latency-1m",
+    "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db",
+    "static-tls"
+  ],
+  "maintainers": [
+    "p8"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "display_name": "go-fasthttp",
+  "language": "Go",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": false,
+    "middleware": false,
+    "request": true,
+    "response": true
+  },
+  "engine": "fasthttp",
+  "description": "High-performance Go HTTP server using fasthttp with zero-allocation design and buffer reuse.",
+  "repo": "https://github.com/valyala/fasthttp",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db",
+    "static-tls"
+  ],
+  "maintainers": []
+}

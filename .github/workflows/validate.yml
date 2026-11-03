@@ -1,0 +1,175 @@
+name: Validate Framework
+
+on:
+  pull_request:
+    paths:
+      - 'frameworks/**'
+      - 'scripts/validate.sh'
+      - 'scripts/validate-ws.py'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+    inputs:
+      framework:
+        description: 'Entry name, a comma-separated list, or "all" for every enabled entry'
+        required: false
+        default: 'all'
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      frameworks: ${{ steps.find.outputs.frameworks }}
+      gateway: ${{ steps.find.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: find
+        # Two lists, because the two halves cannot run on the same machine.
+        #
+        # An entry that ships a compose.*.yml subscribes to gateway-64,
+        # gateway-h3 or production-stack, and those compose files pin cpusets
+        # from the benchmark host — 0-15,64-79 for the edge, 21-31,85-95 for
+        # the server. A GitHub runner has four cores, so Docker refuses to
+        # create the container and the profile fails for reasons that have
+        # nothing to do with the entry. Those go to the self-hosted box.
+        #
+        # The split is per entry, not per profile: validate.sh runs everything
+        # in an entry's `tests` array in one process, so a gateway-subscribed
+        # entry has to run its isolated profiles there too.
+        env:
+          DISPATCH_INPUT: ${{ github.event.inputs.framework }}
+        run: |
+          # Which entries this run covers.
+          #
+          #   * a manual run takes the name, list, or "all" it was given
+          #   * a change to the validator itself covers everything, because a
+          #     validator change can affect any entry. Without this the job
+          #     triggers on scripts/validate.sh and then finds no changed
+          #     frameworks/ paths, so it validates nothing at all -- which is
+          #     what happened to the static staleness probe when it landed.
+          #   * otherwise, just the entries the PR touches
+          # The trailing `return 0` matters: the loop's last command is a jq
+          # that exits non-zero for a disabled entry, so without it the
+          # function inherits that status and `changed=$(all_entries)` aborts
+          # the whole step under `bash -e` -- silently, before anything is
+          # echoed. Whether that happens depends on which entry sorts last and
+          # whether it is enabled, which is not a thing to leave to chance.
+          all_entries() {
+            for m in frameworks/*/meta.json; do
+              fw=$(basename "$(dirname "$m")")
+              jq -e '.enabled != false' "$m" >/dev/null 2>&1 && echo "$fw"
+            done
+            return 0
+          }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "$DISPATCH_INPUT" ] || [ "$DISPATCH_INPUT" = "all" ]; then
+              changed=$(all_entries)
+              echo "manual run over every enabled entry"
+            else
+              changed=$(echo "$DISPATCH_INPUT" | tr ',' '\n' | sed 's/[^A-Za-z0-9._-]//g' | sort -u)
+              echo "manual run over: $(echo $changed)"
+            fi
+          else
+            validator_changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD \
+              | grep -E '^(scripts/validate\.sh|scripts/validate-ws\.py|\.github/workflows/validate\.yml)$' || true)
+            if [ -n "$validator_changed" ]; then
+              changed=$(all_entries)
+              echo "the validator changed, so every enabled entry is covered"
+            else
+              changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD \
+                | grep '^frameworks/' | cut -d'/' -f2 | sort -u || true)
+            fi
+          fi
+
+          std=(); gw=()
+          for fw in $changed; do
+            # Deleted in this PR, or the shared authsvc rather than an entry.
+            [ -d "frameworks/$fw" ] || continue
+            [ -f "frameworks/$fw/meta.json" ] || continue
+            if compgen -G "frameworks/$fw/compose.*.yml" > /dev/null; then
+              gw+=("$fw")
+            else
+              std+=("$fw")
+            fi
+          done
+          as_json() { printf '%s\n' "${@}" | jq -R -s -c 'split("\n") | map(select(length > 0))'; }
+          echo "frameworks=$(as_json "${std[@]:-}")" >> "$GITHUB_OUTPUT"
+          echo "gateway=$(as_json "${gw[@]:-}")"     >> "$GITHUB_OUTPUT"
+          echo "standard: $(as_json "${std[@]:-}")"
+          echo "gateway:  $(as_json "${gw[@]:-}")"
+
+  validate:
+    needs: detect
+    if: needs.detect.outputs.frameworks != '[]'
+    runs-on: ubuntu-latest
+    # A full sweep reaches entries that never appear in a normal PR, and some of
+    # them build from source on a four-core hosted runner -- h2o, the LTO Rust
+    # entries, Swift. 30 minutes was sized for the handful of entries a PR
+    # touches and is not enough for those.
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ${{ fromJson(needs.detect.outputs.frameworks) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate ${{ matrix.framework }}
+        run: ./scripts/validate.sh "${{ matrix.framework }}"
+
+      # validate.sh writes site/data/tls/<entry>.json when it runs the TLS
+      # probes, and the board turns that into the TLS shield. Nothing here
+      # commits it -- one artifact per entry, collected after the run, keeps
+      # 177 parallel jobs from racing each other over one directory. Uploaded
+      # even when validation failed, because a TLS verdict of "fail" is a
+      # result worth having.
+      - name: Collect TLS verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tls-verdict-${{ matrix.framework }}
+          path: site/data/tls/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  validate-gateway:
+    needs: detect
+    if: needs.detect.outputs.gateway != '[]'
+    runs-on: self-hosted
+    # Sequential by construction (see below), so the budget has to cover every
+    # compose entry in the run, not just one. There are eight.
+    timeout-minutes: 300
+    # One at a time, and never alongside a benchmark. Every gateway and
+    # production stack binds the host's ports directly — edge 8443, authsvc
+    # 9090, server 8080 — so two stacks on one box fight over them and the
+    # loser dies on bind. Sharing the `benchmark` group is what keeps a
+    # validation off the box while a measured run is using it, and matches
+    # those workflows' cancel-in-progress: false: a queued run waits rather
+    # than replacing the one holding the machine.
+    concurrency:
+      group: benchmark
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+      # Deliberately a loop rather than a matrix. A matrix job enters the
+      # concurrency group once per entry, and GitHub keeps only one run pending
+      # per group — so three gateway entries in one PR would have the third
+      # cancel the second while it waited. One job holding the slot for all of
+      # them is sequential by construction and cannot cancel itself.
+      #
+      # Every entry runs even if an earlier one fails, so a PR touching several
+      # gets one report instead of one failure and a blank.
+      - name: Validate compose-profile entries (self-hosted, one at a time)
+        run: |
+          failed=()
+          for fw in $(echo '${{ needs.detect.outputs.gateway }}' | jq -r '.[]'); do
+            echo "::group::validate $fw"
+            ./scripts/validate.sh "$fw" || failed+=("$fw")
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::validation failed: ${failed[*]}"
+            exit 1
+          fi
+          echo "all compose-profile entries validated"

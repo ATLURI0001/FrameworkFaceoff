@@ -1,0 +1,15 @@
+{
+  "display_name": "quarkus-jvm",
+  "language": "Java",
+  "type": "flagship",
+  "mode": "tuned",
+  "engine": "vert.x (grpc)",
+  "description": "Quarkus gRPC server using quarkus-grpc on Vert.x with h2c, JDK 21, optimized JVM tuning.",
+  "repo": "https://github.com/quarkusio/quarkus",
+  "enabled": true,
+  "tests": [
+    "unary-grpc",
+    "unary-grpc-tls"
+  ],
+  "maintainers": []
+}

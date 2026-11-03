@@ -1,0 +1,31 @@
+{
+  "display_name": "ngx-php",
+  "language": "PHP",
+  "type": "emerging",
+  "mode": "tuned",
+  "completeness": {
+    "routing": false,
+    "middleware": false,
+    "request": true,
+    "response": false
+  },
+  "engine": "nginx",
+  "description": "Embedded PHP scripting language module for nginx.",
+  "repo": "https://github.com/rryqszq4/ngx-php",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "async-db",
+    "baseline-h2",
+    "static-h2",
+    "baseline-h3",
+    "static-h3"
+  ],
+  "maintainers": [
+    "joanhey"
+  ]
+}

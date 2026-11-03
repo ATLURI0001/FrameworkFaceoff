@@ -1,0 +1,2115 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="canonical" href="https://www.http-arena.com/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>HTTP Web Server Benchmarks – HttpArena</title>
+<meta name="description" content="Independent webserver benchmarks across every major framework and protocol (H1, H2, H3, gRPC, WebSocket) in multiple categories.">
+<style>
+  :root{
+    --bg:#f8f9fa; --panel:#ffffff; --panel-2:#f1f3f4;
+    --line:#dadce0; --line-soft:#e8eaed;
+    --text:#202124; --text-2:#5f6368; --muted:#80868b;
+    --accent:#1a73e8; --accent-weak:#e8f0fe;
+    --gold:#b8901f; --silver:#7e8794; --bronze:#a96b3c;
+    --bar-track:#e8eaed; --fav-bg:#fbf3da; --fav-bg-h:#f5e8bf; --zebra:#f3f4f6;
+    --shadow:0 1px 2px 0 rgba(60,64,67,.1), 0 2px 6px 2px rgba(60,64,67,.06);
+    --header-bg:rgba(255,255,255,.82);
+    --mono:"SF Mono",ui-monospace,"JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  html[data-theme="dark"]{
+    --bg:#202124; --panel:#2a2b2e; --panel-2:#35363a;
+    --line:#3c4043; --line-soft:#303134;
+    --text:#e8eaed; --text-2:#9aa0a6; --muted:#80868b;
+    --accent:#8ab4f8; --accent-weak:#283446;
+    --gold:#d6ab43; --silver:#aab2bf; --bronze:#cf8a55;
+    --bar-track:#3c4043; --fav-bg:#322b17; --fav-bg-h:#3c3420; --zebra:#26282b;
+    --shadow:0 1px 2px 0 rgba(0,0,0,.3), 0 2px 6px 2px rgba(0,0,0,.25);
+    --header-bg:rgba(32,33,36,.8);
+  }
+  @media (prefers-color-scheme: dark){
+    html:not([data-theme="light"]){
+      --bg:#202124; --panel:#2a2b2e; --panel-2:#35363a;
+      --line:#3c4043; --line-soft:#303134;
+      --text:#e8eaed; --text-2:#9aa0a6; --muted:#80868b;
+      --accent:#8ab4f8; --accent-weak:#283446;
+      --gold:#d6ab43; --silver:#aab2bf; --bronze:#cf8a55;
+      --bar-track:#3c4043; --fav-bg:#322b17; --fav-bg-h:#3c3420; --zebra:#26282b;
+      --shadow:0 1px 2px 0 rgba(0,0,0,.3), 0 2px 6px 2px rgba(0,0,0,.25);
+      --header-bg:rgba(32,33,36,.8);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+  a{color:inherit;text-decoration:none}
+
+  .top{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:1.1rem; flex-wrap:wrap; row-gap:.5rem; padding:.72rem 1.5rem; background:var(--header-bg); backdrop-filter:blur(14px) saturate(1.6); -webkit-backdrop-filter:blur(14px) saturate(1.6); border-bottom:1px solid var(--line); box-shadow:0 6px 20px -12px rgba(20,22,40,.25)}
+  .brand{white-space:nowrap; width:calc(264px - .85rem); display:flex; align-items:center; gap:.55rem}  /* spans the sidebar width (type filter aligns with the content column); holds the home link + Timeline/RFC */
+  .brand-name{font-weight:750; font-size:1.06rem; letter-spacing:-.02em; color:var(--text); text-decoration:none; cursor:pointer; flex:none}
+  .brand-name:hover{opacity:.82}
+  .brand-name b{color:var(--accent)}
+  .round{position:relative; flex:none}
+  .round-btn{display:flex; align-items:center; gap:.5rem; background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:.28rem .55rem; cursor:pointer; font:inherit; color:var(--text); transition:border-color .12s ease}
+  .round-btn:hover{border-color:var(--accent)}
+  .round-cur{display:flex; flex-direction:column; align-items:flex-start; gap:0; line-height:1.1}
+  .round-cur .round-name{font-size:.82rem; font-weight:650}
+  .round-sub{font-size:.6rem; color:var(--accent); font-weight:600}
+  .round-chev{width:13px; height:13px; color:var(--muted); transition:transform .2s ease; flex:none}
+  .round.open .round-chev{transform:rotate(180deg)}
+  .round-pop{position:absolute; top:calc(100% + 6px); left:0; min-width:210px; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:.35rem; z-index:50; animation:popIn .16s cubic-bezier(.2,.6,.2,1)}
+  .round-opt{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.45rem .55rem; border-radius:7px; cursor:pointer; font-size:.82rem; color:var(--text-2)}
+  .round-opt:hover{background:var(--panel-2)}
+  .round-opt.active{color:var(--accent); font-weight:600}
+  .round-badge{font-size:.56rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); background:var(--accent-weak); border-radius:999px; padding:.12rem .42rem}
+  .round-empty{padding:.45rem .55rem .35rem; font-size:.72rem; color:var(--muted)}
+  .hw{margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:.05rem; line-height:1.25; flex:none; min-width:0}
+  .chip{font-size:.66rem; color:var(--muted); white-space:nowrap}
+  .chip b{color:var(--text-2); font-weight:650}
+  .top-links{display:flex; align-items:center; gap:.25rem}
+  /* Sits beside the round selector and matches its geometry, but filled with
+     the accent rather than the panel: it is the one header control that leaves
+     the board, and as a quiet outline nobody found it. */
+  .fw-btn{display:flex; align-items:center; gap:.42rem; flex:none; padding:.34rem .7rem; border-radius:10px; border:1px solid var(--accent); background:var(--accent-weak); color:var(--accent); font-size:.82rem; font-weight:700; white-space:nowrap; text-decoration:none; transition:background .12s ease, color .12s ease, box-shadow .12s ease}
+  .fw-btn svg{width:15px; height:15px; flex:none}
+  .fw-btn:hover, .fw-btn:focus-visible{background:var(--accent); color:var(--bg); box-shadow:var(--shadow)}
+  .icon-btn{display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text-2); cursor:pointer; font-size:.9rem}
+  .icon-btn:hover{color:var(--text); border-color:var(--accent)}
+  .icon-btn svg{width:17px; height:17px}
+  .type-filter{display:flex; gap:.25rem; background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:3px; flex:none}
+  .type-filter button{border:0; background:transparent; color:var(--muted); cursor:pointer; font:inherit; font-size:.8rem; font-weight:650; padding:.36rem .72rem; border-radius:7px; white-space:nowrap; transition:all .12s ease}
+  .type-filter button:hover{color:var(--text)}
+  .type-filter button.on{box-shadow:var(--shadow)}
+  .type-filter button[data-type="flagship"].on{background:rgba(46,158,106,.15); color:#1b7a4e}
+  .type-filter button[data-type="emerging"].on{background:rgba(59,115,196,.16); color:#2b5694}
+  .type-filter button[data-type="experimental"].on{background:rgba(217,142,43,.16); color:#8a5a12}
+  .type-filter button[data-type="engine"].on{background:rgba(203,95,81,.15); color:#b0463a}
+  .type-filter button[data-type="infrastructure"].on{background:rgba(47,147,168,.18); color:#277482}
+  html[data-theme="dark"] .type-filter button[data-type="flagship"].on{background:rgba(46,158,106,.24); color:#5cc596}
+  html[data-theme="dark"] .type-filter button[data-type="emerging"].on{background:rgba(59,115,196,.30); color:#9bbdec}
+  html[data-theme="dark"] .type-filter button[data-type="experimental"].on{background:rgba(217,142,43,.28); color:#e8b066}
+  html[data-theme="dark"] .type-filter button[data-type="engine"].on{background:rgba(203,95,81,.24); color:#e89384}
+  html[data-theme="dark"] .type-filter button[data-type="infrastructure"].on{background:rgba(47,147,168,.24); color:#6cc3d2}
+
+  .layout{display:grid; grid-template-columns:264px 1fr; align-items:start}
+  .nav{position:sticky; top:57px; align-self:start; height:calc(100vh - 57px); overflow-y:auto; border-right:1px solid var(--line); padding:.9rem .7rem 3rem; background:transparent; scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+  .nav::-webkit-scrollbar{width:9px}
+  .nav::-webkit-scrollbar-thumb{background:var(--line); border-radius:6px; border:2px solid var(--bg)}
+  .nav::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  .nav::-webkit-scrollbar-track{background:transparent}
+  .nav-mobile{display:none}
+
+  /* page search — pinned to the top of the menu so it stays put while the tree scrolls */
+  .nav-search{position:sticky; top:0; z-index:2; background:var(--bg); padding:.1rem 0 .55rem}
+  .ns-box{position:relative}
+  .ns-box svg{position:absolute; left:.6rem; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none}
+  .nav-search input{font:inherit; font-size:.82rem; width:100%; padding:.45rem .6rem .45rem 1.85rem; background:var(--panel); color:var(--text); border:1px solid var(--line); transition:border-color .15s ease, box-shadow .15s ease}
+  .nav-search input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak)}
+  .nav-search input::-webkit-search-cancel-button{cursor:pointer}
+  .nav-results{margin-bottom:.7rem}
+  .nav-res-h{display:flex; justify-content:space-between; gap:.5rem; margin:.15rem .55rem .4rem; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+  .nav-res{display:block; width:100%; text-align:left; font:inherit; background:none; border:0; border-left:2px solid transparent; padding:.42rem .55rem; cursor:pointer; color:var(--text-2); text-decoration:none}
+  .nav-res:hover, .nav-res.sel{background:var(--panel-2); color:var(--text); border-left-color:var(--text-2)}
+  .nav-res:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  .nav-res-t{display:block; font-size:.83rem; font-weight:600; color:var(--text)}
+  .nav-res-c{display:block; font-size:.66rem; color:var(--muted); margin-top:.08rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .nav-res-s{display:block; font-size:.7rem; color:var(--text-2); margin-top:.2rem; line-height:1.4}
+  .nav-res-s mark{background:var(--accent-weak); color:var(--text); font-weight:600}
+  .nav-empty{padding:.5rem .6rem; font-size:.78rem; color:var(--muted); line-height:1.5}
+
+  .nav-sec{margin-bottom:.4rem}
+  .nav-sec + .nav-sec{margin-top:1rem}
+  .nav-sec-h{display:flex; align-items:center; gap:.35rem; margin:.1rem .55rem .45rem; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+
+  .nav-scope, .nav-item, .nav-grp-h, .nav-subgrp-h{transition:background .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease}
+  .nav-scope{padding:.38rem .6rem .38rem 1.1rem; border-radius:7px; cursor:pointer; color:var(--text-2); font-size:.84rem; font-weight:500}
+  .nav-scope:hover{background:var(--panel-2); color:var(--text); transform:translateX(2px)}
+  .nav-scope.active{background:var(--panel-2); color:var(--text); font-weight:600; box-shadow:inset 2px 0 0 var(--text-2)}
+
+  .nav-item{display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.4rem .6rem; border-radius:7px; cursor:pointer; color:var(--text-2); font-size:.85rem; font-weight:500}
+  .nav-item:hover{background:var(--panel-2); color:var(--text); transform:translateX(2px)}
+  .nav-item.active{background:var(--panel-2); color:var(--text); font-weight:600; box-shadow:inset 2px 0 0 var(--text-2)}
+  .nav-item .n{font-size:.68rem; color:var(--muted); font-variant-numeric:tabular-nums}
+  .nav-item:hover .n{color:var(--text-2)}
+  .nav-item.active .n{color:var(--text-2)}
+
+  .nav-grp-h{display:flex; align-items:center; justify-content:space-between; gap:.4rem; padding:.44rem .55rem; border-radius:7px; cursor:pointer; color:var(--text); font-weight:650; font-size:.86rem; user-select:none}
+  .nav-grp-h:hover{background:var(--panel-2)}
+  .nav-grp-h.active{background:var(--panel-2); box-shadow:inset 2px 0 0 var(--text-2)}
+  .nav-grp-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .nav-ico{display:inline-flex; align-items:center; justify-content:center; flex:none; color:var(--muted); transition:color .12s ease}
+  .nav-ico svg{width:15px; height:15px}
+  .nav-grp-h:hover .nav-ico, .nav-grp.open>.nav-grp-h .nav-ico{color:var(--text)}
+  .nav-grp.lvl0>.nav-grp-h{font-size:.9rem; padding:.5rem .55rem}
+  .lvl0-link{font-size:.9rem; padding:.5rem .55rem; font-weight:650}
+  .nav-subgrp-h{display:flex; align-items:center; gap:.4rem; padding:.34rem .55rem; border-radius:7px; cursor:pointer; color:var(--text-2); font-weight:600; font-size:.78rem; user-select:none}
+  .nav-subgrp-h:hover{background:var(--panel-2); color:var(--text)}
+  .caret{display:inline-flex; align-items:center; justify-content:center; width:.85rem; font-size:.62rem; color:var(--muted); transition:transform .22s cubic-bezier(.4,0,.2,1); flex:none}
+  .nav-grp.open>.nav-grp-h .caret, .nav-subgrp.open>.nav-subgrp-h .caret{transform:rotate(90deg)}
+  /* smooth accordion: animate the row track 0fr -> 1fr, fade the contents */
+  .nav-grp-body{margin-left:.8rem; border-left:1px solid var(--line); padding-left:.5rem; display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s cubic-bezier(.4,0,.2,1)}
+  .nav-grp.open>.nav-grp-body{grid-template-rows:1fr}
+  .nav-grp-inner{overflow:hidden; min-height:0; opacity:0; transition:opacity .18s ease .04s}
+  .nav-grp.open>.nav-grp-body>.nav-grp-inner{opacity:1}
+  .nav-grp-link{flex:1; min-width:0; color:inherit; font:inherit; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .nav-grp-link:hover{text-decoration:underline}
+  a.nav-item{text-decoration:none}
+  .nav-grp-link.active{color:var(--text); font-weight:600}
+  /* ── Knowledge Base prose ── */
+  .doc-wrap{max-width:880px; animation:docIn .26s cubic-bezier(.2,.6,.2,1)}
+  @keyframes docIn{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{animation-duration:.001ms !important; transition-duration:.001ms !important} }
+  .doc-title{font-size:1.7rem; font-weight:750; margin:.1rem 0 1.2rem; color:var(--text); line-height:1.2; letter-spacing:-.01em}
+  .doc-body{font-size:.92rem; line-height:1.7; color:var(--text-2)}
+  .doc-body > :first-child{margin-top:0}
+  .doc-body h2{font-size:1.25rem; font-weight:700; color:var(--text); margin:2rem 0 .8rem; padding-bottom:.35rem; border-bottom:1px solid var(--line); letter-spacing:-.01em}
+  .doc-body h3{font-size:1.06rem; font-weight:650; color:var(--text); margin:1.6rem 0 .55rem}
+  .doc-body h4{font-size:.95rem; font-weight:650; color:var(--text); margin:1.3rem 0 .5rem}
+  .doc-body p{margin:.7rem 0}
+  .doc-body a{color:var(--accent); text-decoration:none}
+  .doc-body a:hover{text-decoration:underline}
+  .doc-body ul,.doc-body ol{margin:.7rem 0; padding-left:1.45rem}
+  .doc-body li{margin:.3rem 0}
+  .doc-body li>ul,.doc-body li>ol{margin:.25rem 0}
+  .doc-body code{font-family:var(--mono); font-size:.84em; background:var(--panel-2); border:1px solid var(--line-soft); border-radius:5px; padding:.08em .36em; color:var(--text)}
+  .doc-body pre{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:.9rem 1.1rem; overflow-x:auto; margin:1rem 0; line-height:1.55}
+  .doc-body pre code{background:none; border:0; padding:0; font-size:.82rem; color:var(--text-2); white-space:pre}
+  .doc-body blockquote{margin:1rem 0; padding:.2rem .9rem; border-left:3px solid var(--accent-weak); color:var(--muted)}
+  .doc-body hr{border:0; border-top:1px solid var(--line); margin:1.6rem 0}
+  .doc-body table{border-collapse:separate; border-spacing:0; width:100%; margin:1.1rem 0; font-size:.85rem; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .doc-body th{text-align:left; font-weight:650; color:var(--text); background:var(--panel-2); padding:.55rem .75rem; border-bottom:1px solid var(--line)}
+  .doc-body td{padding:.5rem .75rem; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  .doc-body tr:last-child td{border-bottom:0}
+  .doc-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:.7rem; margin:1.2rem 0}
+  .doc-card{display:flex; flex-direction:column; gap:.3rem; padding:.85rem 1rem; border:1px solid var(--line); border-radius:10px; background:var(--panel); text-decoration:none; transition:border-color .12s, box-shadow .12s, transform .12s}
+  .doc-card:hover{border-color:var(--accent); box-shadow:var(--shadow); transform:translateY(-1px)}
+  .doc-card .dc-t{font-weight:650; color:var(--text); font-size:.9rem}
+  .doc-card .dc-s{color:var(--muted); font-size:.8rem; line-height:1.5}
+  .type-rules{margin:1.2rem 0; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .type-rules-tabs{display:flex; background:var(--panel-2); border-bottom:1px solid var(--line)}
+  .type-rules-tab{flex:1; display:flex; align-items:center; justify-content:center; gap:.4rem; padding:.6rem 1rem; font-size:.84rem; font-weight:600; cursor:pointer; border:0; background:transparent; color:var(--muted); font-family:inherit; transition:background .15s ease, color .15s ease}
+  .type-rules-tab:hover{color:var(--text)}
+  .type-rules-tab.active{color:var(--text); background:var(--panel)}
+  .tr-sq{width:9px; height:9px; border-radius:3px; display:inline-block}
+  .type-rules-panel{display:none; padding:.9rem 1.1rem; font-size:.88rem; line-height:1.7; color:var(--text-2)}
+  .type-rules-panel.active{display:block}
+  .doc-tabset{margin:1.1rem 0; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .doc-tabs{display:flex; gap:.25rem; background:var(--panel-2); border-bottom:1px solid var(--line); padding:.3rem .3rem 0}
+  .doc-tab{padding:.45rem .9rem; font-size:.83rem; font-weight:600; cursor:pointer; border:0; background:transparent; color:var(--muted); border-radius:7px 7px 0 0; font-family:inherit; transition:background .15s ease, color .15s ease}
+  .doc-tab:hover{color:var(--text)}
+  .doc-tab.active{color:var(--text); background:var(--panel)}
+  .doc-tabpanel{display:none; padding:.4rem 1.1rem 1rem}
+  .doc-tabpanel.active{display:block}
+  .doc-tabpanel>:first-child{margin-top:0}
+
+  .main{padding:1.6rem 1.75rem 4rem; min-width:0; max-width:1180px}
+  .main.cmfull{max-width:none}
+  .phead{display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; flex-wrap:wrap}
+  .phead h1{margin:0; font-size:1.7rem; font-weight:750; letter-spacing:-.02em}
+  .phead .cat{font-size:.74rem; font-weight:650; color:var(--text-2); letter-spacing:.04em; text-transform:uppercase}
+  .phead p{margin:.3rem 0 0; color:var(--text-2); font-size:.9rem; max-width:54ch}
+  .phead p a{color:var(--accent)}
+
+  .seg{position:relative; display:inline-flex; background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:3px}
+  .seg-thumb{position:absolute; top:3px; bottom:3px; left:0; border-radius:6px; background:var(--panel); box-shadow:var(--shadow); transition:transform .26s cubic-bezier(.4,0,.2,1), width .26s cubic-bezier(.4,0,.2,1); z-index:0; pointer-events:none}
+  .seg button{position:relative; z-index:1; border:0; background:transparent; color:var(--text-2); cursor:pointer; font:inherit; font-size:.8rem; font-weight:600; padding:.34rem .75rem; border-radius:6px; font-variant-numeric:tabular-nums; transition:color .18s ease}
+  .seg button:hover{color:var(--text)}
+  .seg button.on{color:var(--accent)}
+
+  /* the composite view stacks its toggles; align-items:stretch makes every row
+     the width of the widest label so the switches line up under each other */
+  #headctl{display:flex; flex-direction:column; align-items:stretch; gap:.5rem}
+  .toggle{display:inline-flex; align-items:center; gap:.55rem; font-size:.82rem; font-weight:600; color:var(--text-2); cursor:pointer; user-select:none; white-space:nowrap}
+  .toggle .sw{width:34px; height:20px; border-radius:999px; background:var(--line); position:relative; transition:background .15s; flex:none}
+  .toggle .sw i{position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .toggle.on{color:var(--accent)} .toggle.on .sw{background:var(--accent)} .toggle.on .sw i{transform:translateX(14px)}
+  .tf-div{width:1px; align-self:stretch; background:var(--muted); opacity:.5; margin:.1rem .5rem}
+  .type-filter button#tunedToggle.on{background:rgba(200,154,60,.18); color:#8f6c1f}
+  html[data-theme="dark"] .type-filter button#tunedToggle.on{background:rgba(200,154,60,.26); color:#d9bd6b}
+
+  .tools{display:flex; align-items:center; gap:.75rem; margin:1.25rem 0 .6rem; flex-wrap:wrap}
+  .search{position:relative; flex:1 1 280px; max-width:640px}
+  .search input{font:inherit; font-size:.85rem; padding:.5rem .7rem .5rem 2rem; width:100%; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:9px; transition:border-color .15s ease, box-shadow .15s ease}
+  .search input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-weak)}
+  .search svg{position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none}
+  .search-pop{position:absolute; top:calc(100% + 6px); left:0; min-width:300px; max-width:min(400px,90vw); width:max-content; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:.35rem; z-index:50; animation:popIn .16s cubic-bezier(.2,.6,.2,1)}
+  @keyframes popIn{from{opacity:0; transform:translateY(-5px)} to{opacity:1; transform:none}}
+  .search-pop-h{font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; padding:.4rem .55rem .3rem}
+  .search-ex{display:flex; align-items:center; gap:.55rem; padding:.4rem .55rem; border-radius:7px; cursor:pointer}
+  .search-ex:hover{background:var(--panel-2)}
+  .search-ex code{font-family:var(--mono); font-size:.78rem; color:var(--accent); background:var(--panel-2); border:1px solid var(--line-soft); border-radius:5px; padding:.08em .4em; white-space:nowrap; flex:none}
+  .search-ex .ex-d{font-size:.78rem; color:var(--muted)}
+  .tfilter{display:flex; gap:.3rem; flex-wrap:wrap}
+  .tfilter button{font:inherit; font-size:.76rem; font-weight:600; cursor:pointer; padding:.32rem .6rem; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--text-2)}
+  .tfilter button:hover{color:var(--text)}
+  .tfilter button.on{background:var(--text); color:var(--bg); border-color:var(--text)}
+  .count{margin-left:auto; color:var(--muted); font-size:.8rem; font-variant-numeric:tabular-nums}
+  /* Sits in the tools bar rather than the header: the board is where someone
+     decides they want two of these entries side by side, and /compare/ was
+     three clicks and a guess away from here. Same .fw-btn shape as the header's
+     Frameworks link, one notch smaller so the search box stays the loudest
+     thing in the row. */
+  .cmp-btn{font-size:.78rem; padding:.4rem .66rem}
+  /* Under 700px the row is search + count + this, and the full label is wider
+     than the search box it wraps under. The icon carries it there. */
+  @media (max-width:700px){ .cmp-btn span{display:none} .cmp-btn{padding:.4rem .5rem} }
+
+  /* Build-time ranking, written into #rows by gen_leaderboard_data.py and thrown
+     away by renderComposite() as soon as data.js has been parsed. It is what a
+     reader without JavaScript gets, and what paints first for everyone else. */
+  .sb{width:100%; border-collapse:collapse; font-size:.86rem}
+  .sb th,.sb td{padding:.44rem .55rem; border-bottom:1px solid var(--line-soft); text-align:left}
+  .sb th{color:var(--muted); font-size:.72rem; font-weight:650; letter-spacing:.02em; text-transform:uppercase}
+  .sb td.n,.sb th.n{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .sb td.r1{color:var(--gold); font-weight:700} .sb td.r2{color:var(--silver); font-weight:700} .sb td.r3{color:var(--bronze); font-weight:700}
+  .sb .sb-lang{color:var(--text-2)}
+  .sb-note{color:var(--muted); font-size:.78rem; margin:.9rem 0 0}
+  .sb-note a{color:var(--accent)}
+  .board-seo{margin:2.6rem 0 1rem; max-width:70ch; color:var(--text-2); font-size:.88rem}
+  .board-seo:empty{display:none}
+  .board-seo h2{font-size:1.05rem; font-weight:700; color:var(--text); margin:1.6rem 0 .4rem; letter-spacing:-.01em}
+  .board-seo h3{font-size:.9rem; font-weight:650; color:var(--text); margin:1rem 0 .2rem}
+  .board-seo p{margin:.4rem 0}
+  .board-seo a{color:var(--accent)}
+  .board-seo ul{margin:.4rem 0; padding-left:1.1rem}
+
+  .grid{--cols:54px minmax(250px,2fr) minmax(150px,1fr) 112px 92px 92px 96px 86px}
+  .thead,.row{display:grid; grid-template-columns:var(--cols); align-items:center}
+  .thead{position:sticky; top:57px; z-index:10; background:var(--bg); padding:.1rem 0 .55rem; border-bottom:1px solid var(--line); font-size:.72rem; font-weight:650; color:var(--muted); letter-spacing:.02em; text-transform:uppercase}
+  .thead .th{padding:.2rem .55rem; cursor:pointer; user-select:none; white-space:nowrap}
+  .thead .th.num{text-align:right}
+  .thead .th:hover{color:var(--text)}
+  .thead .th .ar{opacity:0; margin-left:.2rem; font-size:.65rem}
+  .thead .th.sorted{color:var(--accent)} .thead .th.sorted .ar{opacity:1}
+
+  .row{border-bottom:1px solid var(--line-soft); transition:background .12s}
+  .row:nth-child(even){background:var(--zebra)}
+  .row:hover{background:var(--panel-2)}
+  .row .c{padding:.62rem .55rem; min-width:0}
+  .row .num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:.83rem; color:var(--text)}
+  .row .sub{color:var(--text-2)}
+  .rank{font-family:var(--mono); font-size:.85rem; color:var(--muted); text-align:center; font-variant-numeric:tabular-nums}
+  .rank.r1{color:var(--gold); font-weight:700} .rank.r2{color:var(--silver); font-weight:700} .rank.r3{color:var(--bronze); font-weight:700}
+
+  .fw{display:flex; align-items:center; gap:.55rem; min-width:0}
+  .dot{width:8px; height:8px; border-radius:3px; flex:none}
+  .fw .nm{font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
+  .fw .nm a:hover{color:var(--accent)}
+  .fw .lang{font-size:.74rem; white-space:nowrap; flex:none}
+  .badge{font-size:.6rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:.1rem .34rem; border-radius:5px; white-space:nowrap; flex:none}
+  /* type as a small colored square (no label) in tables; fixed lang slot keeps names aligned. .badge stays for the modal */
+  .tsq{width:10px; height:10px; border-radius:3px; flex:none; display:inline-block}
+  /* One rule per line: these five used to share a line, and removing the
+     infrastructure tier (#1017) took the whole line with it, leaving every
+     square transparent. */
+  .tsq-flagship{background:#2e9e6a}
+  .tsq-emerging{background:#3b73c4}
+  .tsq-experimental{background:#d98e2b}
+  .tsq-engine{background:#cb5f51}
+  .tsq-infrastructure{background:#2f93a8}
+  /* 'tuned' mode, said in words. This was a 4px yellow bar beside the type
+     square: it marked the row as different without saying what was different,
+     and the difference is the whole point - a tuned number is one you get by
+     reading the entry's source and doing the work yourself, not one you get by
+     installing the framework (#1103). Same .badge shape as the type pill in the
+     modal, so the two read as one family. */
+  /* Row scale. .badge is sized for the modal header; beside a 10px type square
+     the word only has to be legible, and the colour is what catches the eye
+     first anyway. Shares .b-tuned with the modal so both stay one colour. */
+  .tnd{font-size:.53rem; font-weight:700; letter-spacing:.02em; text-transform:uppercase;
+    padding:.04rem .22rem; border-radius:4px; line-height:1.6; white-space:nowrap;
+    flex:none; cursor:default}
+  /* The pill sits in a fixed slot rather than in the flex flow. Putting a marker
+     beside the type square to make a clean left-hand cue, and then letting it
+     shove the square, the language code and the name sideways on the 36% of rows
+     that have one, undoes the reason for putting it there. Right-aligned so it
+     sits snug against the square; empty on standard rows. */
+  .tndslot{width:2.75rem; flex:none; display:flex; justify-content:flex-end; align-items:center}
+  .b-tuned{background:rgba(200,154,60,.16); color:#8a6414}
+  html[data-theme="dark"] .b-tuned{background:rgba(200,154,60,.2); color:#e0b45e}
+  /* medals - how many golds/silvers/bronzes the entry holds. Dropped below 820px,
+     where the name column halves and the count is not worth what it would cost. */
+  .mdls{display:inline-flex; align-items:center; gap:.3rem; flex:none; cursor:default}
+  .mdl{display:inline-flex; align-items:center; gap:.1rem; font-size:.7rem; line-height:1}
+  .mdl b{font-family:var(--mono); font-size:.68rem; font-weight:700}
+  .mdl-gold b{color:var(--gold)} .mdl-silver b{color:var(--silver)} .mdl-bronze b{color:var(--bronze)}
+  @media (max-width:820px){ .mdls{display:none} }
+  .fw .lang, .cm .fwcell .lang{width:3rem; flex:none; overflow:hidden; text-overflow:ellipsis}
+  .b-flagship{background:rgba(46,158,106,.13); color:#1b7a4e} html[data-theme="dark"] .b-flagship{color:#5cc596}
+  .b-emerging{background:rgba(59,115,196,.14); color:#2b5694} html[data-theme="dark"] .b-emerging{color:#9bbdec}
+  .b-experimental{background:rgba(217,142,43,.14); color:#8a5a12} html[data-theme="dark"] .b-experimental{color:#e8b066}
+  .b-engine{background:rgba(203,95,81,.13); color:#b0463a} html[data-theme="dark"] .b-engine{color:#e89384}
+  .b-infrastructure{background:rgba(47,147,168,.14); color:#277482} html[data-theme="dark"] .b-infrastructure{color:#6cc3d2}
+
+  .meter{position:relative; display:flex; flex-direction:column; align-items:flex-end; gap:.28rem; padding:.5rem .55rem !important}
+  .meter .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600; font-size:.85rem}
+  .meter .bar{height:4px; width:100%; background:var(--bar-track); border-radius:3px; overflow:hidden}
+  .meter .bar i{display:block; height:100%; border-radius:3px}
+  .zero{color:var(--muted)}
+  .meter .mtop{display:flex; align-items:baseline; gap:.4rem}
+  .statwrap{position:relative; display:inline-flex; align-items:center}
+  .statwrap .err{color:#ef4444; font-weight:700; font-size:.72rem; font-family:var(--mono); cursor:default}
+  .statwrap .ok{color:#16a34a; font-size:.74rem; cursor:default}
+  html[data-theme="dark"] .statwrap .err{color:#f87171}
+  html[data-theme="dark"] .statwrap .ok{color:#4ade80}
+  .stattip{position:absolute; bottom:calc(100% + 7px); right:0; z-index:25; display:none; flex-direction:column; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:.45rem .6rem; white-space:nowrap; font-size:.72rem; font-family:var(--mono); color:var(--text-2)}
+  .stattip span{display:flex; justify-content:space-between; gap:.7rem}
+  .stattip b{color:var(--text); font-weight:600}
+  .statwrap:hover .stattip{display:flex}
+  /* The whole result row behind one composite cell. Separate from #tip, which
+     is plain text by design (textContent + pre-line); this one is a table. */
+  #dtip{position:fixed; z-index:101; display:none; background:var(--panel); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow);
+    padding:.55rem .7rem; font-size:.72rem; line-height:1.4; pointer-events:none;
+    max-width:340px}
+  #dtip .dh{font-weight:700; font-size:.76rem}
+  #dtip .dsub{color:var(--muted); font-size:.68rem; margin-bottom:.35rem}
+  #dtip .dc{color:var(--text-2); font-weight:650; font-size:.67rem; text-transform:uppercase;
+    letter-spacing:.03em; margin:.45rem 0 .16rem; padding-top:.34rem; border-top:1px solid var(--line-soft)}
+  #dtip .dc .dtag{float:right; text-transform:none; letter-spacing:0; font-weight:500; color:var(--muted)}
+  #dtip table{border-collapse:collapse; width:100%}
+  #dtip td{padding:.05rem 0; vertical-align:baseline}
+  #dtip td.k{color:var(--muted); padding-right:.8rem; white-space:nowrap}
+  #dtip td.v{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+  #dtip .dfoot{margin-top:.4rem; padding-top:.32rem; border-top:1px solid var(--line-soft);
+    color:var(--muted); font-size:.67rem}
+  #tip{position:fixed; z-index:100; display:none; white-space:pre-line; max-width:280px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:.5rem .65rem; font-size:.74rem; line-height:1.45; font-weight:500; pointer-events:none}
+
+  /* row-click info modal */
+  .row, .cm tbody tr{cursor:pointer}
+  .modal-ov{position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); padding:1rem; backdrop-filter:blur(2px)}
+  .modal-ov.open{display:flex}
+  .modal-card{background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:14px; box-shadow:0 24px 64px rgba(0,0,0,.32); max-width:460px; width:100%; padding:1.4rem 1.5rem; position:relative}
+  .modal-x{position:absolute; top:.6rem; right:.8rem; border:0; background:transparent; color:var(--muted); font-size:1.5rem; line-height:1; cursor:pointer}
+  .modal-x:hover{color:var(--text)}
+  .modal-h{display:flex; align-items:center; gap:.55rem; margin:0 1.6rem .4rem 0}
+  .modal-h h3{margin:0; font-size:1.2rem; font-weight:750; letter-spacing:-.01em}
+  .modal-meta{color:var(--text-2); font-size:.8rem; margin-bottom:.8rem}
+  .modal-desc{color:var(--text-2); font-size:.86rem; line-height:1.55; margin:0 0 1.1rem}
+  .modal-sub{font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 .45rem}
+  .modal-mdl{display:flex; flex-direction:column; gap:.15rem; margin:0 0 1.1rem; max-height:196px; overflow:auto}
+  .modal-mdl a{display:flex; align-items:center; gap:.55rem; padding:.3rem .35rem; border-radius:7px}
+  .modal-mdl a:hover{background:var(--panel-2)}
+  .modal-mdl .mi{flex:none; font-size:.9rem}
+  .modal-mdl .mw{flex:1; min-width:0; font-size:.8rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .modal-mdl .mw em{display:block; font-style:normal; font-size:.68rem; font-weight:500; color:var(--muted)}
+  .modal-mdl .mr{flex:none; font-family:var(--mono); font-size:.7rem; color:var(--text-2)}
+  .modal-links{display:flex; flex-direction:column; gap:.5rem}
+  .modal-links a{display:flex; align-items:center; justify-content:space-between; gap:.5rem; color:var(--accent); font-weight:600; font-size:.86rem; padding:.55rem .75rem; border:1px solid var(--line); border-radius:9px; transition:background .12s, border-color .12s}
+  .modal-links a:hover{background:var(--accent-weak); border-color:var(--accent)}
+  .empty{padding:3rem 1rem; text-align:center; color:var(--muted)}
+
+
+  /* ── Composite matrix ────────────────────────────────────── */
+  /* table scrolls natively in both axes (bar drag, wheel, trackpad and finger all work); its own horizontal bar is hidden so only the synced bar shows */
+  .cwrap{display:block; width:100%; overflow-x:auto; overflow-y:auto; max-height:calc(100vh - 210px); border:1px solid var(--line); border-radius:10px; margin-top:.15rem; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+  .cwrap::-webkit-scrollbar{width:10px; height:0}
+  .cwrap::-webkit-scrollbar-thumb{background:var(--line); border-radius:6px}
+  .cwrap::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+  .cwrap::-webkit-scrollbar-track{background:transparent}
+  /* touch devices: let the table run full height so the PAGE gives the single vertical scroll (no nested scroll); horizontal finger-scroll stays */
+  @media (hover: none) and (pointer: coarse){ .cwrap{max-height:none} }
+  /* synced horizontal scrollbar + jump-to-end button above the table */
+  .cscroll-row{display:flex; align-items:stretch; gap:.4rem; margin-top:.5rem}
+  .cscroll-row.endonly{justify-content:flex-end; margin-top:.1rem; margin-bottom:.35rem}
+  .cscroll{flex:1; min-width:0; overflow-x:auto; overflow-y:hidden; background:var(--panel-2); border:1px solid var(--line); scrollbar-width:auto; scrollbar-color:var(--text-2) var(--panel-2)}
+  .cscroll-end{flex:none; display:inline-flex; align-items:center; justify-content:center; width:28px; background:var(--panel); border:1px solid var(--line); color:var(--text-2); cursor:pointer; padding:0}
+  .cscroll-end:hover{color:var(--accent); border-color:var(--accent)}
+  .cscroll-end svg{width:14px; height:14px}
+  .cscroll::-webkit-scrollbar{height:14px}
+  .cscroll::-webkit-scrollbar-track{background:var(--panel-2)}
+  .cscroll::-webkit-scrollbar-thumb{background:var(--text-2); border:2px solid var(--panel-2)}
+  .cscroll::-webkit-scrollbar-thumb:hover{background:var(--text)}
+  .cscroll>div{height:1px}
+  table.cm{border-collapse:separate; border-spacing:0; width:100%; min-width:max-content; font-size:.78rem; line-height:1.2}
+  .cm th,.cm td{padding:.24rem .45rem; border-bottom:1px solid var(--line-soft); border-right:1px solid var(--line-soft); white-space:nowrap; background:var(--bg)}
+  .cm th:last-child,.cm td:last-child{border-right:0}
+  .cm tbody tr:last-child td{border-bottom:0}
+  .cm thead th{position:sticky; top:0; z-index:3; background:var(--bg); border-bottom:1px solid var(--line); font-size:.70rem; text-transform:uppercase; letter-spacing:.02em; color:var(--muted); font-weight:650; text-align:left; cursor:pointer}
+  .cm thead th:hover{color:var(--text)}
+  .cm th.num,.cm td.num{text-align:left; font-variant-numeric:tabular-nums; font-family:var(--mono)}
+  /* per-profile columns: fixed width so they don't stretch to fill the screen */
+  .cm th.pcol, .cm td.pc{width:1px}
+  .cm th.pcol{white-space:normal; line-height:1.2; vertical-align:bottom}
+  .cm td.pc{color:var(--text-2); line-height:1.1; vertical-align:middle; position:relative}
+  /* slim per-cell quality cue: bar length = this result's normalized score in its profile */
+  .cm td.pc .cbar{position:absolute; left:0; bottom:0; height:2px; background:var(--muted); opacity:.45}
+  /* Heat map: the cell becomes the reading. The number and the memory figure go
+     away, the quality bar fills the cell instead of sitting 2px along the
+     bottom, and the score is carried by colour rather than by width - so a
+     column can be scanned vertically for shape instead of read value by value.
+     The hover popup still has every figure for the cell under the cursor. */
+  /* Geometry must not move when the toggle flips: the same table, recoloured.
+     So the cell keeps its padding, the value keeps its box and only loses its
+     ink (visibility, not display - display:none collapses the row height), and
+     the bar is stretched over the whole cell by its four offsets rather than by
+     a width. Nothing here sets a padding, a height or a row height. */
+  /* Deliberately not a .toggle. The two switches above the table change how the
+     numbers are computed - memory in the score, what the scale is relative to -
+     and belong with the heading that describes them. This changes how the table
+     is drawn, so it sits with the other thing that acts on the table, and looks
+     like a button you press rather than a setting you leave set. */
+  .heat-btn{cursor:pointer; font-family:inherit; font-size:.78rem; padding:.4rem .66rem}
+  .heat-btn svg{width:14px; height:14px; flex:none; fill:currentColor}
+  .heat-btn:hover{background:var(--accent); color:var(--bg)}
+  .heat-btn[aria-pressed="true"]{background:var(--accent); color:var(--bg); border-color:var(--accent)}
+  .heatkey{display:flex; align-items:center; flex-wrap:wrap; gap:.1rem .55rem;
+    font-size:.66rem; color:var(--muted)}
+  .heatkey .hk-l{margin-right:.1rem}
+  .heatkey .hk{display:inline-flex; align-items:center; gap:.28rem; white-space:nowrap}
+  .heatkey .hk i{width:11px; height:11px; border-radius:2px; display:inline-block}
+  /* The column leader. In heat mode it is otherwise just another cell in the top
+     band - everything above 75% of the leader is the same green, the leader
+     included - so the one cell that won the column carried no mark at all. Sits
+     over the band rather than replacing it, so the band still reads. */
+  .cm td.pc .hcrown{display:none}
+  .cm.heat td.pc .hcrown{display:flex; position:absolute; inset:0; z-index:1;
+    align-items:center; justify-content:center; pointer-events:none}
+  .cm.heat td.pc .hcrown svg{width:17px; height:17px; display:block;
+    fill:var(--gold); filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.55))}
+  .heatkey .hk i.hk-crown{width:auto; height:auto; display:inline-flex; align-items:center}
+  .heatkey .hk i.hk-crown svg{width:13px; height:13px; display:block; fill:var(--gold)}
+  .cm.heat td.pc .pcv{visibility:hidden}
+  .cm.heat td.pc .cbar{left:0; right:0; top:0; bottom:0; width:auto; height:auto; opacity:1}
+  /* .cm td.pc.lead .cbar sets opacity:.7 for the non-heat bar and sits later in
+     this sheet at equal specificity, so it was still dimming the leader here -
+     rendering its band at 70% as a darker green that is in no legend. The crown
+     is the mark now, so the cell keeps its band exactly. Before the .nc rule, so
+     a leader in a column that does not count still reads as not counting. */
+  .cm.heat td.pc.lead .cbar{opacity:1}
+  .cm.heat td.pc.nc .cbar{opacity:.55}
+  .cm td.pc.lead .cbar{background:var(--accent); opacity:.7}
+  .cm td.pc .pcv{display:flex; align-items:baseline; justify-content:space-between; gap:.45rem}
+  .cm td.pc .crps{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--text)}
+  .cm td.pc .cmem{font-size:.60rem; color:var(--muted)}
+  .cm td.pc.empty{color:var(--line-soft); text-align:center; font-family:var(--sans)}
+  .cm td.pc.lead .crps{font-weight:700}
+  .cm td.pc.nc{opacity:.4}
+  .cm th.pcol.refcol{opacity:.45}
+  /* Two affordances per profile column: open that profile's detail view, and
+     open its implementation guide. They sit on their own line under the label,
+     so the column (width:1px, shrink-to-fit) does not get any wider. */
+  /* One segmented control spanning the column: left half opens the profile's
+     detail view, right half its implementation guide. Full width rather than a
+     pair of 12px squares - these are the only way into a profile from here, and
+     a target that small is hard to hit and easy to miss entirely. The 1px gap
+     over a --line background is the divider, so no inner borders are needed.
+     min-width:0 on the halves keeps min-content at zero, so a narrow column is
+     never widened by the control. */
+  .cm th.pcol .pnav{display:flex; gap:1px; margin:.4rem -.45rem -.24rem;
+    background:var(--line-soft); border-top:1px solid var(--line-soft)}
+  .cm th.pcol .pico{flex:1 1 0; min-width:0; display:inline-flex; align-items:center;
+    justify-content:center; height:21px; background:var(--panel); color:var(--text-2);
+    font:600 .74rem/1 var(--sans); text-transform:none; letter-spacing:0;
+    cursor:pointer; text-decoration:none; transition:background .12s ease, color .12s ease}
+  .cm th.pcol .pico:hover{background:var(--accent); color:var(--bg)}
+  .cm th.pcol .pico:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  /* flexible trailing column absorbs leftover width (keeps the box filled) */
+  .cm .spacer{width:auto; min-width:0; border-right:0; padding:0; cursor:default; background:var(--bg)}
+  .cm .sticky{position:sticky}
+  .cm thead th.sticky{z-index:5}
+  .cm tbody td.sticky{z-index:2}
+  .cm .rankh,.cm .rankc{left:0; width:44px; min-width:44px; text-align:left; color:var(--muted); font-family:var(--mono); font-variant-numeric:tabular-nums}
+  .cm .rankc.r1{color:var(--gold);font-weight:700} .cm .rankc.r2{color:var(--silver);font-weight:700} .cm .rankc.r3{color:var(--bronze);font-weight:700}
+  /* 53px wider than it was, which is what a full 🥇n 🥈n 🥉n cluster takes -
+     the name column keeps the room it had. */
+  .cm .fwh,.cm .fwcell{left:44px; width:356px; min-width:356px; max-width:356px; text-align:left}
+  .cm .fwcell .fl{display:flex; align-items:center; gap:.45rem}
+  .cm .fwcell .nm{font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0}
+  .cm .fwcell .lang{flex:none; font-size:.72rem; white-space:nowrap}
+  .cm .fwcell .nm a:hover{color:var(--accent)}
+  /* 8px wider than it was: the ? and its gap are what the header gained, and an
+     auto-layout column would otherwise grow past the 104px floor on its own.
+     Then 20px wider again for the 0-1000 per-profile scale: the largest total
+     on any board went from 1,041 to 10,412, and the completeness delta beside
+     it from (-26) to (-260). The cell is nowrap, so the digits had to fit.
+     Safe to widen because this is the last sticky column - nothing else has a
+     left offset that depends on its width. */
+  .cm .scoreh,.cm .scorec{left:400px; width:132px; min-width:132px; box-shadow:7px 0 9px -5px rgba(0,0,0,.22)}
+  .cm .scoreh + th, .cm .scorec + td{padding-left:1.3rem}
+  /* The one column with a method behind it, and the method has a term - the
+     completeness factor - that cannot be read off the table. Every other header
+     explains itself in a tooltip; this one needs to say out loud that there is
+     something to open. Sized to sit inside the header beside the sort arrow,
+     and it does not sort when clicked. Boxed rather than circled: the sharp-edge
+     reset at the end of this sheet wins over any border-radius set here. */
+  .cm .scoreh .hq{display:inline-flex; align-items:center; justify-content:center; width:12px; height:12px;
+    margin-left:.34rem; border:1px solid currentColor; font:700 .58rem/1 var(--sans);
+    text-transform:none; letter-spacing:0; opacity:.55; vertical-align:1px; color:inherit}
+  .cm .scoreh .hq:hover{opacity:1; color:var(--accent); border-color:var(--accent)}
+  .cm .scorec .sc{display:flex; flex-direction:column; align-items:flex-start; gap:.12rem}
+  .cm .scorec .sc b{font-weight:600; color:var(--text); font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:.80rem}
+  /* No bonus colour: the completeness factor is 1.00 at best, so the delta is
+     never positive and a green state here would be unreachable. */
+  .cm .scorec .sc b .cmp{font-weight:500; font-size:.68rem; line-height:1; letter-spacing:-.01em; margin-left:.2rem}
+  .cm .scorec .sc b .cmp.pen{color:#c0392b} html[data-theme="dark"] .cm .scorec .sc b .cmp.pen{color:#f0857a}
+  .cm .scorec .sc .bar{width:100%; height:3px; background:var(--bar-track); overflow:hidden}
+  .cm .scorec .sc .bar i{display:block; height:100%; border-radius:3px}
+  .cm tbody tr:nth-child(even) td{background:var(--zebra)}
+  .cm tbody tr:hover td{background:var(--panel-2)}
+  @media (max-width:820px){ .cm .fwh,.cm .fwcell{width:218px;min-width:218px;max-width:218px} .cm .scoreh,.cm .scorec{left:262px} }
+  /* Compact Framework column. The full cell carries a favourite star, the tuned
+     slot, the type square, a language slot and the medals before the name gets
+     any room - 356px of a table whose point is the profile columns to the right
+     of it. Compact keeps the three things that identify the row and gives the
+     other 156px back to the numbers.
+     Higher specificity than the 820px rule above, so it wins at every width
+     without repeating itself inside the media query. */
+  .cm.compact .fwh,.cm.compact .fwcell{width:200px; min-width:200px; max-width:200px}
+  .cm.compact .scoreh,.cm.compact .scorec{left:244px}
+  /* The tuned cue goes back to the bar it was before #1225: at this width there
+     is no room for the word, and next to the square it still reads as "this row
+     is marked". The pill is what the full column shows. */
+  .cm.compact .tsq.tuned{position:relative}
+  .cm.compact .tsq.tuned::after{content:""; position:absolute; top:0; bottom:0;
+    right:calc(100% + 2px); width:4px; background:#c89a3c}
+  /* Same boxed shape as the Composite header's ?, and like it, clicking it must
+     not sort the column it lives in. */
+  /* Sized and coloured as a control, not as an annotation. The ? next to
+     Composite is a footnote you may never need; this one is a thing to press,
+     and at 16x12 in currentColor at .55 opacity nobody found it. It carries its
+     own panel background and a filled .on state, so whether the column is
+     compact is readable without counting what is in the cells.
+     No border-radius: the reset at the end of this sheet squares everything. */
+  .cm .fwh .fwtog{display:inline-flex; align-items:center; justify-content:center;
+    min-width:30px; height:19px; padding:0 5px; margin-left:.5rem;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text-2);
+    font:700 .78rem/1 var(--mono); text-transform:none; letter-spacing:.04em;
+    vertical-align:-4px; cursor:pointer; user-select:none;
+    transition:background .12s ease, color .12s ease, border-color .12s ease}
+  .cm .fwh .fwtog:hover,.cm .fwh .fwtog:focus-visible{background:var(--accent-weak);
+    color:var(--accent); border-color:var(--accent); outline:none}
+  .cm .fwh .fwtog.on{background:var(--accent); border-color:var(--accent); color:var(--bg)}
+  /* small screens: un-freeze the left columns so the whole table scrolls horizontally and the result cells are reachable (header keeps vertical stick) */
+  @media (max-width:640px){ .cm .sticky{left:auto; box-shadow:none} .cm tbody td.sticky{z-index:auto} }
+
+  /* ── Favourites (shared with the classic board via localStorage) ── */
+  .star{cursor:pointer; flex:none; color:transparent; font-size:.92rem; line-height:1; transition:color .12s; user-select:none; -webkit-user-select:none}
+  .row:hover .star, .cm tbody tr:hover .star{color:var(--muted)}
+  .star:hover{color:#f5a623 !important}
+  .star.on{color:#caa23e !important}
+  .row.fav{background:var(--fav-bg); box-shadow:inset 3px 0 0 #caa23e}
+  .row.fav:hover{background:var(--fav-bg-h)}
+  .row.fav .nm{font-weight:700}
+  .cm tbody tr.fav td{background:var(--fav-bg)}
+  .cm tbody tr.fav:hover td{background:var(--fav-bg-h)}
+  .cm tbody tr.fav td.rankc{box-shadow:inset 3px 0 0 #caa23e}
+  .cm tbody tr.fav .nm{font-weight:700}
+
+  @media (max-width:1024px){ .col-cpu,.thead .th.col-cpu,.col-bw,.thead .th.col-bw{display:none} .grid{--cols:50px minmax(220px,2fr) minmax(140px,1fr) 86px 86px 84px} }
+  @media (max-width:820px){
+    .layout{grid-template-columns:1fr}
+    .brand{width:auto}
+    /* the tree is replaced by the select above, but keep page search reachable */
+    .nav{display:block; position:static; height:auto; overflow:visible; border-right:0; padding:.75rem 1.25rem 0}
+    #navTree{display:none}
+    .nav-search{position:static; padding:0}
+    .nav-mobile{display:block; padding:1rem 1.25rem 0}
+    .nav-mobile select{width:100%; font:inherit; padding:.55rem .7rem; border-radius:9px; border:1px solid var(--line); background:var(--panel); color:var(--text)}
+    .col-avg,.thead .th.col-avg,.col-mem,.thead .th.col-mem,.col-bw,.thead .th.col-bw{display:none}
+    .grid{--cols:42px minmax(190px,1.8fr) minmax(120px,1fr) 84px}
+    .main{padding:1.1rem 1.1rem 4rem}
+    .thead,.row{top:auto}
+    .hw{display:none}
+  }
+  /* sharp edges - no rounded corners anywhere */
+  *, *::before, *::after{border-radius:0 !important}
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <a class="brand-name" href="#" id="brandHome" aria-label="HttpArena home"><b>Http</b>Arena</a>
+      <a class="icon-btn" href="https://timeline.http-arena.com" target="_blank" rel="noopener" title="Timeline" aria-label="Timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></a>
+      <a class="icon-btn" href="https://mda2av.github.io/Http11Probe/" target="_blank" rel="noopener" title="RFC Compliance" aria-label="RFC Compliance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></a>
+    </div>
+    <div class="type-filter" id="typeFilter">
+      <button data-type="flagship" data-tip="Proven in production - real applications are built and operated on it at scale, and it is actively maintained. A runtime’s own HTTP server counts; a router and middleware are not required.">Flagship</button>
+      <button data-type="emerging" data-tip="A genuine, working server that is not yet production-proven - young, niche, or without real deployments to point to.">Emerging</button>
+      <button data-type="experimental" data-tip="Very new, unproven work. Ranked with frameworks but hidden until you select it.">Experimental</button>
+      <span class="tf-div" aria-hidden="true"></span>
+      <button data-type="engine" data-tip="An HTTP implementation applications are not written against - raw sockets, low-level I/O, or a WSGI/ASGI-style host. Ranked separately.">Engine</button>
+      <button data-type="infrastructure" data-tip="Reverse proxies and static-file servers (e.g. nginx, h2o) run without an application framework layer. Ranked separately.">Infra</button>
+      <span class="tf-div" aria-hidden="true"></span>
+      <button id="tunedToggle" type="button" class="on" data-tip="Show tuned entries - non-default configuration / optimizations (marked with a yellow TUNED pill).">Tuned</button>
+    </div>
+    <div class="round" id="round"></div>
+    <a class="fw-btn" href="/frameworks/" data-tip="A results page for every entry, grouped by language, plus a summary comparing the entries of each language."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Frameworks</span></a>
+    <div class="hw" id="hw"></div>
+    <div class="top-links">
+      <a class="icon-btn" href="https://github.com/MDA2AV/HttpArena" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg></a>
+      <a class="icon-btn" href="https://discord.gg/H84B5ZqDXR" target="_blank" rel="noopener" title="Discord" aria-label="Discord"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg></a>
+      <button class="icon-btn" id="theme" title="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <div class="nav-mobile"><select id="navSelect"></select></div>
+
+  <div class="layout">
+    <aside class="nav" id="nav">
+      <div class="nav-search">
+        <div class="ns-box">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="navq" type="search" placeholder="Search pages" autocomplete="off" spellcheck="false"
+                 aria-label="Search pages" role="combobox" aria-expanded="false" aria-controls="navResults">
+        </div>
+      </div>
+      <div class="nav-results" id="navResults" role="listbox" aria-label="Search results" style="display:none"></div>
+      <div id="navTree"></div>
+    </aside>
+    <main class="main">
+      <div class="phead">
+        <div>
+          <div class="cat" id="pcat"></div>
+          <h1 id="ptitle"></h1>
+          <p id="pblurb"></p>
+        </div>
+        <div id="headctl"></div>
+      </div>
+
+      <div class="tools">
+        <div class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="q" type="search" placeholder="Search name, language, engine - comma to combine, ! to exclude (e.g. rust, !go)" autocomplete="off">
+        </div>
+        <a class="fw-btn cmp-btn" href="/compare/all/" data-tip="Put any two entries side by side - every profile they both run, requests per second, p99 and the delta. Any two, in any language."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13"/><path d="m14 5 3 3-3 3"/><path d="M20 16H7"/><path d="m10 13-3 3 3 3"/></svg><span>Head to Head Comparison</span></a>
+        <button class="fw-btn heat-btn" id="heatBtn" type="button" aria-pressed="false"
+                data-tip="Colour every profile cell by its score as a share of that column\u2019s leader, instead of printing the number. For reading a column\u2019s shape at a glance; the figures stay in the hover popup."><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.6" height="7.6" rx="1.2"/><rect x="13.4" y="3" width="7.6" height="7.6" rx="1.2" opacity=".5"/><rect x="3" y="13.4" width="7.6" height="7.6" rx="1.2" opacity=".5"/><rect x="13.4" y="13.4" width="7.6" height="7.6" rx="1.2"/></svg><span>Heat map</span></button>
+        <div class="heatkey" id="heatKey" style="display:none"></div>
+        <span class="count" id="count"></span>
+      </div>
+
+      <div class="grid" id="grid">
+        <div class="thead" id="thead"></div>
+        <div id="rows"></div>
+      </div>
+      <div id="docview" class="docview" style="display:none"></div>
+      <!-- filled by the deploy (build_index_page): the copy, the questions and the
+           hub links a crawler needs on the one page that is only a table. -->
+      <section class="board-seo" id="boardSeo"></section>
+    </main>
+  </div>
+
+<!-- deferred so the browser can paint the pre-rendered ranking before it spends
+     anything parsing 700KB of results. search.js is not here at all: it is the
+     Knowledge Base index, 290KB for a search box most visits never touch, and
+     initNavSearch() fetches it the first time someone uses it. -->
+<script defer src="data.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  "use strict";
+  var D = window.LB_DATA;
+  var LB_DOCS = window.LB_DOCS || {};
+  // Run-logs are deployed at /logs/ (the board is the root site). Locally,
+  // serve site/ and open /leaderboard/ so ../static/logs/ reaches site/static/logs/.
+  var LOGBASE = (location.protocol==='file:' || location.pathname.indexOf('/leaderboard/')>=0) ? '../static/logs/' : '/logs/';
+  // Keep whatever is already in #rows: the deploy pre-renders the default
+  // ranking into it, and data.js failing to load is precisely when that
+  // fallback earns its keep. Only an empty #rows (a local checkout that has
+  // never run the generator) gets the build instruction.
+  if(!D){ var _r=document.getElementById('rows');
+          if(_r && !_r.firstElementChild) _r.innerHTML='<div class="empty">data.js not found - run scripts/gen_leaderboard_data.py</div>';
+          return; }
+
+  // ── maps ─────────────────────────────────────────────────
+  var PROF = {}; D.profiles.forEach(function(p){ PROF[p.id]=p; });
+  // Medals, gold first, computed at build time by gen_leaderboard_data.py out of
+  // the same fields the badges rank. Deliberately not recomputed against the
+  // filters in view: an entry holds a medal, it does not stop holding it while
+  // someone is looking at another league.
+  var ACHV = D.achievements || {};
+  var FWLANG = {};
+  Object.keys(D.results).forEach(function(k){ D.results[k].forEach(function(r){ if(r.lang) FWLANG[r.fw]=r.lang; }); });
+
+  var COMPOSITE = '__composite__';
+  var SCOPES = [{k:'h1',label:'H/1.1'},{k:'h2',label:'H/2'},{k:'h3',label:'H/3'},{k:'gw',label:'Gateway'},{k:'grpc',label:'gRPC'},{k:'ws',label:'WebSocket'}];
+  function familyOf(p){ return {'Gateway':'gw','HTTP/2':'h2','HTTP/3':'h3','gRPC':'grpc','WebSocket':'ws'}[p.category]||'h1'; }
+  // cats must list every CATALOG category that belongs to the family. This is
+  // the nav's only source of profiles, so a category missing here disappears
+  // from Detailed Views entirely while still ranking on the composite --
+  // which is how async and latency-1m went missing when they were added.
+  var FAMILIES=[{k:'h1',label:'HTTP/1.1',cats:['Connection','Concurrency','Efficiency','Workload','Database']},{k:'h2',label:'HTTP/2',cats:['HTTP/2']},{k:'h3',label:'HTTP/3',cats:['HTTP/3']},{k:'gw',label:'Gateway',cats:['Gateway']},{k:'grpc',label:'gRPC',cats:['gRPC']},{k:'ws',label:'WebSocket',cats:['WebSocket']}];
+  var expanded=new Set(['composite']);
+  // state.lang is an exact language filter, distinct from the q search box: q
+  // matches substrings across name/language/engine, which is fine for typing but
+  // useless as an addressable filter - q=C matches 73 of 78 entries, q=V matches
+  // 33. The language rank badges link here, so the field they claim has to be
+  // the field the page shows.
+  var state = { view:'composite', profile:null, conns:null, sortKey:'rps', sortDir:-1, types:['flagship','emerging'], q:'', lang:'', useMem:false, scope:'h1', showTuned:true, rescale:false, compactFw:false, heat:false };
+
+  // ── parsing helpers ──────────────────────────────────────
+  function lat(s){ if(!s) return Infinity; var m=String(s).match(/([\d.]+)\s*(us|ms|s)/); if(!m) return Infinity; var v=parseFloat(m[1]); return m[2]==='us'?v:m[2]==='ms'?v*1e3:v*1e6; }
+  function cpu(s){ var v=parseFloat(s); return isNaN(v)?0:v; }
+  function mem(s){ if(!s) return 0; var m=String(s).match(/([\d.]+)\s*([KMG]i?B)/i); if(!m) return 0; var v=parseFloat(m[1]),u=m[2].toUpperCase(); return u[0]==='G'?v*1024:u[0]==='M'?v:u[0]==='K'?v/1024:v; }
+  function bw(s){ if(!s) return 0; var m=String(s).match(/([\d.]+)\s*([KMG]?B)\/s/i); if(!m) return 0; var v=parseFloat(m[1]),u=m[2].toUpperCase(); return u[0]==='G'?v*1e9:u[0]==='M'?v*1e6:u[0]==='K'?v*1e3:v; }
+  function typeOf(fw){ return (D.meta[fw] && D.meta[fw].type) || 'emerging'; }
+  function modeOf(fw){ return (D.meta[fw] && D.meta[fw].mode) || 'standard'; }
+  // What the word has to carry that the bar did not: tuned is not "a bit
+  // faster", it is a number the reader cannot get by choosing the framework.
+  var TUNED_TIP='Tuned - non-default configuration and hand optimizations. This is not what you '
+    + 'get by installing the framework: reproducing it means reading this entry\u2019s source '
+    + 'and applying it to your own application.';
+  // cls picks the size: 'tnd' in table rows, the default .badge in the modal
+  // header where it sits beside the type badge at that badge's scale.
+  function tunedPill(fw, cls){
+    return modeOf(fw)==='tuned'
+      ? '<span class="'+(cls||'badge')+' b-tuned" data-tip="'+esc(TUNED_TIP)+'">tuned</span>' : '';
+  }
+  // A shield beside the name for an entry whose TLS was probed and came back
+  // clean: the mounted certificate, TLS 1.3, an AEAD cipher, and no obsolete
+  // protocol or weak cipher accepted. Absent means unverified, not failed --
+  // most entries have no TLS profile at all.
+  var TLS_TIP = 'TLS verified - serves the certificate the harness mounts, negotiates TLS 1.3 with an AEAD cipher, and refuses SSLv3, TLS 1.0/1.1 and NULL, anonymous, export, RC4, DES and 3DES ciphers.';
+  // The opt-in TLS section: certificate rotation, SNI, resumption, close_notify
+  // and the vulnerability suite, all on the HTTP/1.1 listener. Only ever shown
+  // on the H1 composite -- h2 and h3 have their own listeners and are not
+  // covered by it, so a badge earned on :8081 must not follow the entry into
+  // views it says nothing about.
+  var TLS_CHECK_TIP = 'TLS hardened - opted into the TLS section and passed it: rotates its certificate without a restart and without dropping traffic, answers with and without SNI, closes at the TLS layer, and reports no HIGH or CRITICAL finding from the vulnerability suite.';
+  // The composite views are keyed by scope; 'h1' is the HTTP/1.1 one.
+  function h1View(){ return state.view === 'composite' && state.scope === 'h1'; }
+  function tlsCheckBadge(fw){
+    var m = D.meta[fw];
+    if(!m || m.tlsCheck !== 'pass' || !h1View()) return '';
+    return '<span class="tlssec" data-tip="'+esc(TLS_CHECK_TIP)+'" aria-label="TLS hardened">'
+         + '<svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">'
+         + '<path fill="currentColor" d="M12 1.5 3.8 4.9v6.2c0 5 3.5 9.7 8.2 11.4 4.7-1.7 8.2-6.4 8.2-11.4V4.9z"/>'
+         + '<path fill="none" stroke="#fff" stroke-width="2.1" stroke-linejoin="round" d="m12 6.6 1.6 3.4 3.6.5-2.6 2.6.6 3.7-3.2-1.8-3.2 1.8.6-3.7-2.6-2.6 3.6-.5z"/>'
+         + '</svg></span>';
+  }
+  function repoOf(fw){ return D.meta[fw] && D.meta[fw].repo; }
+  function langOf(fw){ return FWLANG[fw] || ''; }
+  function engineOf(fw){ return (D.meta[fw] && D.meta[fw].engine) || ''; }
+
+  // ── medals ───────────────────────────────────────────────
+  var MEDALS=['gold','silver','bronze'];
+  var MEDAL_ICO={gold:'🥇',silver:'🥈',bronze:'🥉'};
+  var AXIS_LABEL={family:'Family composite', language:'Within its language', profile:'Test profile'};
+  function medalsOf(fw){ return ACHV[fw] || []; }
+  function medalTip(list){
+    var l=list.slice(0,8).map(function(a){ return MEDAL_ICO[a.medal]+' '+a.group+' · '+a.label+' - '+a.rank+' of '+a.of; });
+    if(list.length>l.length) l.push('+'+(list.length-l.length)+' more - open the entry');
+    return l.join('\n');
+  }
+  function medalChips(fw){
+    var list=medalsOf(fw); if(!list.length) return '';
+    var h='';
+    MEDALS.forEach(function(m){
+      var n=list.filter(function(a){ return a.medal===m; }).length;
+      if(n) h+='<span class="mdl mdl-'+m+'">'+MEDAL_ICO[m]+'<b>'+n+'</b></span>';
+    });
+    return '<span class="mdls" data-tip="'+esc(medalTip(list))+'">'+h+'</span>';
+  }
+  // Search: comma-separated terms matched against name/language/engine. Positive
+  // terms are OR'd; a "!term" excludes any match. Show if (no positive terms or
+  // one matches) AND no negative term matches.
+  function matchQ(fw, lang){
+    var s=(state.q||'').toLowerCase().trim(); if(!s) return true;
+    var terms=s.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+    if(!terms.length) return true;
+    var name=(fw||'').toLowerCase(), lg=(lang||langOf(fw)||'').toLowerCase(), eng=engineOf(fw).toLowerCase();
+    function hit(t){ return name.indexOf(t)>=0 || lg.indexOf(t)>=0 || eng.indexOf(t)>=0; }
+    var pos=[], neg=[];
+    terms.forEach(function(t){ if(t.charAt(0)==='!'){ var n=t.slice(1).trim(); if(n) neg.push(n); } else pos.push(t); });
+    if(neg.some(hit)) return false;
+    if(pos.length && !pos.some(hit)) return false;
+    return true;
+  }
+  function typeAbbr(t){ return {flagship:'flagship', emerging:'emerging', experimental:'experimental', engine:'engine', infrastructure:'infra'}[t] || t; }
+  var TYPE_TIP={
+    flagship:'Flagship - proven in production: real applications are built and operated on it at scale, and it is actively maintained. A runtime’s own HTTP server counts; a router and middleware are not required.',
+    emerging:'Emerging - a genuine, working server that is not yet production-proven (young, niche, or without real deployments to point to).',
+    experimental:'Experimental - very new, unproven work. Ranked with frameworks but hidden until selected.',
+    engine:'Engine - an HTTP implementation applications are not written against: raw sockets, low-level I/O, or a WSGI/ASGI-style host. Ranked separately.',
+    infrastructure:'Infrastructure - reverse proxies and static-file servers (e.g. nginx, h2o) run without an application framework layer. Ranked separately.'
+  };
+  function typeTip(t){ return TYPE_TIP[t]||t; }
+  var TIP={
+    rps:'Peak requests per second (best of 3 runs).',
+    bw:'Bandwidth - response bytes served per second.',
+    avg:'Average request latency.',
+    p99:'99th-percentile latency - 99% of requests were faster than this.',
+    cpu:'CPU usage across all cores (100% = one full core).',
+    mem:'Peak container memory (RSS) during the run.',
+    score:'Composite - sum of normalized per-profile scores (each profile leader = 1000), less 2.5% for each of routing, middleware, request and response the entry does not do for you. The (-n) beside a score is what that cost it.',
+    scoreWs:'Composite - sum of normalized per-profile scores (each profile leader = 1000). The completeness factor does not apply here: routing, middleware, request and response are the HTTP path, and this board is not measuring it.',
+    scoreHelp:'How the composite is built: every scored profile is worth 1000 to the entry leading it - including the fixed-rate profiles, which are normalized on their own CPU-and-tails score rather than on requests per second. Those scores are summed, and the total is cut by 2.5% for each of routing, middleware, request and response the entry leaves to you — its completeness factor, ×1.00 down to ×0.90. Opens the scoring docs.',
+    scoreHelpWs:'How the composite is built: every scored profile is worth 1000 to the entry leading it, and those scores are summed. The completeness factor that scales the HTTP boards is not applied here — its four axes are the HTTP request-to-response path, which this family does not measure. Opens the scoring docs.',
+    fw:'Framework - click the name to open its repository.',
+    fwCompact:'Narrow this column to the type square, the tuned mark and the name, and give the width back to the profile columns.',
+    fwExpand:'Widen this column back to the favourite star, the tuned pill, the language and the medals.'
+  };
+  // Every field the published row carries for one framework on one profile,
+  // across each connection count the profile ran. A column can only show one
+  // number; this is the rest of it, so a cell can be interrogated rather than
+  // only read.
+  var DT_ROWS=[
+    ['rps','Requests/sec',1],['cpu','CPU'],['cpu_per_req_us','CPU / req','us'],
+    ['memory','Memory'],['avg_latency','Avg latency'],['p99_latency','p99'],
+    ['p99_9_latency','p99.9'],['rate_ratio','Rate held'],['target_rate','Target rate',1],
+    ['bandwidth','Bandwidth'],['input_bw','Ingress BW'],
+    ['status_2xx','2xx',1],['status_3xx','3xx',1],['status_4xx','4xx',1],
+    ['status_5xx','5xx',1],['reconnects','Reconnects',1]
+  ];
+  // 3xx/4xx/5xx are zero on almost every row, and three zero lines per
+  // connection count is most of the popup's height on a profile that ran four
+  // of them. Collapsed to one line unless something actually happened.
+  function dtipStatus(r){
+    var n=['status_3xx','status_4xx','status_5xx'], any=false;
+    n.forEach(function(k){ if(+(r[k]||0)>0) any=true; });
+    return any?null:'<tr><td class="k">non-2xx</td><td class="v">0</td></tr>';
+  }
+  function dtipHtml(pid,fw,nc){
+    var p=PROF[pid]; if(!p) return '';
+    var scored={}; (p.scoredConns||[]).forEach(function(c){scored[c]=1;});
+    var blocks='', foot='';
+    (p.conns||[]).forEach(function(c){
+      var list=(D.results&&D.results[pid+'-'+c])||[];
+      var r=null; for(var i=0;i<list.length;i++){ if(list[i].fw===fw){r=list[i];break;} }
+      if(!r) return;
+      var tr='';
+      var collapsed=dtipStatus(r);
+      DT_ROWS.forEach(function(f){
+        if(collapsed && (f[0]==='status_3xx'||f[0]==='status_4xx'||f[0]==='status_5xx')) return;
+        var v=r[f[0]];
+        if(v===undefined||v===null||v==='') return;
+        if(f[2]===1) v=(+v).toLocaleString(); else if(f[2]) v=v+f[2];
+        tr+='<tr><td class="k">'+esc(f[1])+'</td><td class="v">'+esc(String(v))+'</td></tr>';
+        if(collapsed && f[0]==='status_2xx') tr+=collapsed;
+      });
+      if(!tr) return;
+      blocks+='<div class="dc">'+(+c).toLocaleString()+' conn'
+            + '<span class="dtag">'+(scored[c]?'counts':'not counted')+'</span></div>'
+            + '<table>'+tr+'</table>';
+      var rm=(D.runmeta||{})[pid+'-'+c];
+      if(rm&&!foot){
+        var bits=[];
+        if(rm.threads) bits.push(rm.threads+' gen threads');
+        if(rm.duration) bits.push(rm.duration);
+        if(rm.pipeline&&+rm.pipeline>1) bits.push('pipeline '+rm.pipeline);
+        foot=bits.join(' \u00b7 ');
+      }
+    });
+    if(!blocks) return '';
+    var why=nc?(p.scored===false
+        ? ' \u00b7 reference profile, not part of the composite'
+        : ' \u00b7 ran, but not counted toward this type\u2019s composite'):'';
+    return '<div class="dh">'+esc(fw)+'</div><div class="dsub">'+esc(p.label)
+         + (p.category?' \u00b7 '+esc(p.category):'')+esc(why)+'</div>'+blocks
+         + (foot?'<div class="dfoot">'+esc(foot)+'</div>':'');
+  }
+
+  // The heat-map control lives in the tools row beside Head to Head Comparison
+  // rather than with the two switches over the heading, and is wired once here
+  // instead of being rebuilt by renderHead: the button's own handler calls
+  // render(), which redraws the table and not the control strip, so anything
+  // rebuilt there would not react to the click that changed it.
+  function initHeat(){
+    var btn=document.getElementById('heatBtn'), key=document.getElementById('heatKey');
+    if(!btn||!key) return;
+    key.innerHTML='<span class="hk-l">share of column leader</span>'
+      + HEAT_BANDS.map(function(b){
+          return '<span class="hk"><i style="background:'+b[1]+'"></i>'+esc(b[2])+'</span>';
+        }).join('')
+      + '<span class="hk"><i class="hk-crown">'+CROWN_SVG+'</i>best in column</span>';
+    key.setAttribute('data-tip','Each cell is coloured by its score as a share of the best score in that column.');
+    function paint(){
+      btn.setAttribute('aria-pressed', state.heat?'true':'false');
+      key.style.display = state.heat ? '' : 'none';
+    }
+    btn.onclick=function(){ state.heat=!state.heat; paint(); render(); };
+    paint();
+  }
+  // Only the composite view has profile columns to colour.
+  function syncHeatCtl(){
+    var btn=document.getElementById('heatBtn'), key=document.getElementById('heatKey');
+    var on = state.view==='composite';
+    if(btn) btn.style.display = on ? '' : 'none';
+    if(key) key.style.display = (on && state.heat) ? '' : 'none';
+  }
+
+  function initTips(){
+    var tip=document.createElement('div'); tip.id='tip'; document.body.appendChild(tip);
+    var dtip=document.createElement('div'); dtip.id='dtip'; document.body.appendChild(dtip);
+    function dpos(el){
+      var r=el.getBoundingClientRect(); dtip.style.display='block';
+      var w=dtip.offsetWidth, h=dtip.offsetHeight;
+      var l=r.left+r.width/2-w/2, t=r.top-h-8;
+      if(t<6) t=r.bottom+8;
+      if(t+h>window.innerHeight-6) t=Math.max(6, window.innerHeight-h-6);
+      l=Math.max(6,Math.min(l,window.innerWidth-w-6));
+      dtip.style.left=l+'px'; dtip.style.top=t+'px';
+    }
+    document.addEventListener('mouseover', function(e){
+      var td=e.target.closest?e.target.closest('td.pc[data-pid]'):null;
+      if(!td) return;
+      var h=dtipHtml(td.dataset.pid, td.dataset.fw, td.dataset.nc==='1');
+      if(!h){ dtip.style.display='none'; return; }
+      dtip.innerHTML=h; dpos(td);
+    });
+    document.addEventListener('mouseout', function(e){
+      var td=e.target.closest?e.target.closest('td.pc[data-pid]'):null;
+      if(td && !td.contains(e.relatedTarget)) dtip.style.display='none';
+    });
+    document.addEventListener('scroll', function(){ dtip.style.display='none'; }, true);
+    function pos(el){ var r=el.getBoundingClientRect(); tip.style.display='block'; var tw=tip.offsetWidth, th=tip.offsetHeight; var l=r.left+r.width/2-tw/2, t=r.top-th-8; if(t<6)t=r.bottom+8; l=Math.max(6,Math.min(l,window.innerWidth-tw-6)); tip.style.left=l+'px'; tip.style.top=t+'px'; }
+    document.addEventListener('mouseover', function(e){ var el=e.target.closest?e.target.closest('[data-tip]'):null; if(!el)return; tip.textContent=el.getAttribute('data-tip'); pos(el); });
+    document.addEventListener('mouseout', function(e){ var el=e.target.closest?e.target.closest('[data-tip]'):null; if(el && !el.contains(e.relatedTarget)) tip.style.display='none'; });
+    document.addEventListener('scroll', function(){ tip.style.display='none'; }, true);
+  }
+  // URL segment for an entry's own page under /frameworks/. Must stay in step
+  // with _slug() in gen_leaderboard_data.py, which is what names the directory.
+  function slugOf(fw){ return String(fw).replace(/[^A-Za-z0-9._-]+/g,'-').replace(/^-|-$/g,'').toLowerCase() || 'unnamed'; }
+  function openModal(fw){
+    var m=D.meta[fw]||{}, lang=langOf(fw)||m.language||'', c=lc(lang), t=m.type||'emerging', dir=m.dir||fw;
+    var impl='https://github.com/MDA2AV/HttpArena/tree/main/frameworks/'+encodeURIComponent(dir);
+    var h='<div class="modal-card">'
+      + '<button class="modal-x" data-close aria-label="Close">×</button>'
+      + '<div class="modal-h"><span class="dot" style="background:'+c.accent+'"></span><h3>'+esc(fw)+'</h3>'+tlsCheckBadge(fw)+'<span class="badge b-'+t+'" data-tip="'+esc(typeTip(t))+'">'+typeAbbr(t)+'</span>'+tunedPill(fw)+'</div>'
+      + '<div class="modal-meta">'+esc([lang, m.engine, typeAbbr(t), modeOf(fw)==='tuned'?'tuned':'',
+          cmpDecl(fw)&&CMP_TYPES.indexOf(t)>=0 ? 'completeness '+(4-cmpMissing(fw).length)+'/4' : ''].filter(Boolean).join(' · '))+'</div>';
+    if(m.desc) h+='<p class="modal-desc">'+esc(m.desc)+'</p>';
+    var mdl=medalsOf(fw);
+    if(mdl.length){
+      h+='<div class="modal-sub">Achievements</div><div class="modal-mdl">';
+      mdl.forEach(function(a){
+        h+='<a href="'+esc(a.link)+'"><span class="mi">'+MEDAL_ICO[a.medal]+'</span>'
+         + '<span class="mw">'+esc(a.group+' · '+a.label)+'<em>'+esc(AXIS_LABEL[a.axis])+'</em></span>'
+         + '<span class="mr">'+a.rank+' of '+a.of+'</span></a>';
+      });
+      h+='</div>';
+    }
+    h+='<div class="modal-links">';
+    h+='<a href="/frameworks/'+encodeURIComponent(slugOf(fw))+'/"><span>Results page</span><span>→</span></a>';
+    if(m.repo) h+='<a href="'+esc(m.repo)+'" target="_blank" rel="noopener"><span>Official repository</span><span>↗</span></a>';
+    if(m.website) h+='<a href="'+esc(m.website)+'" target="_blank" rel="noopener"><span>Official website</span><span>↗</span></a>';
+    h+='<a href="'+impl+'" target="_blank" rel="noopener"><span>Benchmark implementation</span><span>↗</span></a>';
+    if(state.view==='profile' && state.profile && state.conns){
+      var log=LOGBASE+state.profile+'/'+state.conns+'/'+encodeURIComponent(dir)+'.log';
+      h+='<a href="'+log+'" target="_blank" rel="noopener"><span>Run log - '+esc(PROF[state.profile].label)+' · '+state.conns+'c</span><span>↗</span></a>';
+    }
+    h+='</div></div>';
+    var mod=document.getElementById('modal'); mod.innerHTML=h; mod.classList.add('open');
+  }
+  function closeModal(){ var m=document.getElementById('modal'); if(m){ m.classList.remove('open'); m.innerHTML=''; } }
+  function initModal(){
+    var mod=document.createElement('div'); mod.id='modal'; mod.className='modal-ov'; document.body.appendChild(mod);
+    mod.addEventListener('click', function(e){ if(e.target===mod || (e.target.closest && e.target.closest('[data-close]'))) closeModal(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+  }
+  function fmt(n){ return n>0 ? n.toLocaleString('en-US') : '-'; }
+  function fmtK(n){ n=n||0; if(n>=1e6) return (n/1e6).toFixed(2)+'M'; if(n>=1e3) return (n/1e3).toFixed(0)+'k'; return n>0?Math.round(n).toString():'-'; }
+  function fmtMem(m){ m=m||0; if(m<=0) return '-'; return m>=1024 ? (m/1024).toFixed(2)+' GiB' : Math.round(m)+' MiB'; }
+  function statusHtml(r){
+    var s2=+(r.status_2xx||0), s3=+(r.status_3xx||0), s4=+(r.status_4xx||0), s5=+(r.status_5xx||0);
+    if(s2+s3+s4+s5<=0) return '';
+    var errs=s4+s5;
+    var ind = errs>0 ? '<span class="err">'+fmtK(errs)+'</span>' : '<span class="ok">✓</span>';
+    return '<span class="statwrap">'+ind+'<span class="stattip"><span><b>2xx</b>'+s2.toLocaleString()+'</span><span><b>3xx</b>'+s3.toLocaleString()+'</span><span><b>4xx</b>'+s4.toLocaleString()+'</span><span><b>5xx</b>'+s5.toLocaleString()+'</span></span></span>';
+  }
+  function lc(lang){ return D.langColors[lang] || {accent:'#94a3b8', text:'#64748b', textDark:'#94a3b8', rgb:'148,163,184'}; }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  var DARK = function(){ var t=document.documentElement.getAttribute('data-theme'); return t==='dark' || (t!=='light' && matchMedia('(prefers-color-scheme: dark)').matches); };
+
+  // ── favourites (shared with the classic board) ───────────
+  var FAVKEY='httparena-favorites';
+  var favs=new Set(); try{ (JSON.parse(localStorage.getItem(FAVKEY)||'[]')||[]).forEach(function(f){favs.add(f);}); }catch(e){}
+  function saveFavs(){ try{ localStorage.setItem(FAVKEY, JSON.stringify(Array.from(favs))); }catch(e){} }
+  function toggleFav(fw){ if(favs.has(fw)) favs.delete(fw); else favs.add(fw); saveFavs(); applyFavs(); }
+  function applyFavs(){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-fw-row]'), function(el){ el.classList.toggle('fav', favs.has(el.getAttribute('data-fw-row'))); });
+    Array.prototype.forEach.call(document.querySelectorAll('.star[data-fw]'), function(s){ s.classList.toggle('on', favs.has(s.getAttribute('data-fw'))); });
+  }
+  function starHtml(fw){ return '<span class="star'+(favs.has(fw)?' on':'')+'" data-fw="'+esc(fw)+'" title="Favourite - highlights this framework across every view">★</span>'; }
+
+  // ── sidebar ──────────────────────────────────────────────
+  // Collapsible body: an inner wrapper enables the grid-rows accordion. Append
+  // children to body.firstChild.
+  function navBody(){
+    var b=document.createElement('div'); b.className='nav-grp-body';
+    var inner=document.createElement('div'); inner.className='nav-grp-inner';
+    b.appendChild(inner); return b;
+  }
+  // Small icons for the level-0 groups.
+  var NAVICO={
+    kb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+    composite:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="10"/></svg>',
+    detailed:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'
+  };
+  function navIco(k){ return '<span class="nav-ico">'+NAVICO[k]+'</span>'; }
+  function buildNav(){
+    // #navTree, not #nav — the search box above it is static markup and must
+    // survive the rebuilds that every navigation triggers, or typing would
+    // lose focus mid-query.
+    var nav=document.getElementById('navTree'); nav.innerHTML='';
+    var byCat={}; D.profiles.forEach(function(p){ (byCat[p.category]=byCat[p.category]||[]).push(p); });
+
+    // 1. Knowledge Base (top) - a plain link out to /docs/. The docs are real
+    // pages now, so every leaf navigated away anyway; expanding the tree here
+    // just duplicated the nav that the Knowledge Base already carries.
+    if(D.docs && D.docs.c && D.docs.c.length){
+      var ks=document.createElement('div'); ks.className='nav-sec';
+      var kb=document.createElement('a');
+      kb.className='nav-grp-h lvl0-link'; kb.href=docUrl('');
+      kb.innerHTML=navIco('kb')+'<span class="nav-grp-t">'+esc(D.docs.t||'Knowledge Base')+'</span>';
+      ks.appendChild(kb);
+      nav.appendChild(ks);
+    }
+
+    // 2. Composite - scope options nested under it
+    var cs=document.createElement('div'); cs.className='nav-sec';
+    var cgrp=document.createElement('div'); cgrp.className='nav-grp lvl0'+(expanded.has('composite')?' open':'');
+    var cgh=document.createElement('div'); cgh.className='nav-grp-h'; cgh.innerHTML=navIco('composite')+'<span class="nav-grp-t">Composite</span><span class="caret">▸</span>';
+    cgh.onclick=function(){ toggleGrp(cgrp,'composite'); }; cgrp.appendChild(cgh);
+    var cbody=navBody();
+    SCOPES.forEach(function(sc){
+      var it=document.createElement('div'); it.className='nav-item'+(state.view==='composite'&&state.scope===sc.k?' active':'');
+      it.textContent=sc.label; it.onclick=function(){ pickScope(sc.k); }; cbody.firstChild.appendChild(it);
+    });
+    cgrp.appendChild(cbody); cs.appendChild(cgrp); nav.appendChild(cs);
+
+    // 3. Detailed Views - families (→ profiles) nested inside one collapsible group
+    var bs=document.createElement('div'); bs.className='nav-sec';
+    var dgrp=document.createElement('div'); dgrp.className='nav-grp lvl0'+(expanded.has('detailed')?' open':'');
+    var dgh=document.createElement('div'); dgh.className='nav-grp-h'; dgh.innerHTML=navIco('detailed')+'<span class="nav-grp-t">Detailed Views</span><span class="caret">▸</span>';
+    dgh.onclick=function(){ toggleGrp(dgrp,'detailed'); }; dgrp.appendChild(dgh);
+    var dbody=navBody();
+    FAMILIES.forEach(function(fam){
+      var grp=document.createElement('div'); grp.className='nav-grp'+(expanded.has(fam.k)?' open':'');
+      var gh=document.createElement('div'); gh.className='nav-grp-h'; gh.innerHTML='<span>'+esc(fam.label)+'</span><span class="caret">▸</span>';
+      gh.onclick=function(){ toggleGrp(grp, fam.k); }; grp.appendChild(gh);
+      var body=navBody();
+      fam.cats.forEach(function(cat){ (byCat[cat]||[]).forEach(function(p){ body.firstChild.appendChild(profItem(p)); }); });
+      grp.appendChild(body); dbody.firstChild.appendChild(grp);
+    });
+    dgrp.appendChild(dbody); bs.appendChild(dgrp); nav.appendChild(bs);
+    buildMobileNav(byCat);
+  }
+  function expandDocAncestors(id){
+    expanded.add('');  // the Knowledge Base root group
+    var parts=id.split('/'), acc='';
+    for(var i=0;i<parts.length;i++){ acc=acc?(acc+'/'+parts[i]):parts[i]; expanded.add(acc); }
+  }
+  // Docs are pre-rendered static pages at /docs/<id>/ (real, indexable URLs).
+  function docUrl(id){ return id ? '/docs/'+id+'/' : '/docs/'; }
+  function pickDoc(id){ location.href=docUrl(id); }   // callers (mobile nav) navigate out
+  function scrollToAnchor(a){
+    if(!a) return;
+    var el=document.querySelector('#docview [id="'+a+'"]');
+    if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  // In-page routing for links/cards inside rendered docs.
+  function initDocLinks(){
+    var dv=document.getElementById('docview'); if(!dv) return;
+    dv.addEventListener('click', function(e){
+      var a=e.target.closest('a'); if(!a || !dv.contains(a)) return;
+      var did=a.getAttribute('data-doc'), anc=a.getAttribute('data-anchor');
+      if(did!==null){ e.preventDefault(); pickDoc(did); if(anc) setTimeout(function(){ scrollToAnchor(anc); }, 0); return; }
+      if(anc){ e.preventDefault(); scrollToAnchor(anc); }
+    });
+  }
+  // Round selector - current (ongoing) round + any archived rounds.
+  function initRounds(){
+    var el=document.getElementById('round'); if(!el) return;
+    var r=(D.rounds)||{name:'Alpha Round', ongoing:true, archived:[]};
+    var archived=r.archived||[];
+    el.innerHTML='<button class="round-btn" id="roundBtn" type="button">'
+      +'<span class="round-cur"><span class="round-name">'+esc(r.name||'Current')+'</span>'
+      +(r.ongoing?'<span class="round-sub">(ongoing)</span>':'')+'</span>'
+      +'<svg class="round-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+      +'</button><div class="round-pop" id="roundPop" style="display:none"></div>';
+    var pop=el.querySelector('#roundPop');
+    var html='<div class="round-opt active"><span>'+esc(r.name||'Current')+'</span>'+(r.ongoing?'<span class="round-badge">ongoing</span>':'')+'</div>';
+    if(archived.length){ archived.forEach(function(a){ html+='<div class="round-opt" data-round="'+esc(a.id||'')+'"><span>'+esc(a.name||a.id||'')+'</span></div>'; }); }
+    else { html+='<div class="round-empty">No archived rounds yet</div>'; }
+    pop.innerHTML=html;
+    var btn=el.querySelector('#roundBtn');
+    function close(){ el.classList.remove('open'); pop.style.display='none'; }
+    btn.onclick=function(e){ e.stopPropagation(); if(el.classList.contains('open')) close(); else { el.classList.add('open'); pop.style.display=''; } };
+    pop.addEventListener('click', function(){ close(); });
+    document.addEventListener('click', function(e){ if(!el.contains(e.target)) close(); });
+  }
+  // Examples popover under the search input - appears on focus.
+  function initSearchHelp(){
+    var wrap=document.querySelector('.search'), inp=document.getElementById('q'); if(!wrap||!inp) return;
+    var EX=[
+      {q:'rust', d:'one language'},
+      {q:'rust, go', d:'multiple - matches any'},
+      {q:'c#, java, kotlin', d:'combine several'},
+      {q:'nginx', d:'by engine'},
+      {q:'!go', d:'exclude - all except Go'},
+      {q:'rust, !actix', d:'include Rust, exclude actix'}
+    ];
+    var pop=document.createElement('div'); pop.className='search-pop'; pop.style.display='none';
+    var html='<div class="search-pop-h">Examples · comma matches any</div>';
+    EX.forEach(function(e){ html+='<div class="search-ex" data-q="'+esc(e.q)+'"><code>'+esc(e.q)+'</code><span class="ex-d">'+esc(e.d)+'</span></div>'; });
+    pop.innerHTML=html; wrap.appendChild(pop);
+    function show(){ pop.style.display=''; } function hide(){ pop.style.display='none'; }
+    inp.addEventListener('focus', show);
+    inp.addEventListener('click', show);
+    inp.addEventListener('blur', function(){ setTimeout(hide, 130); });
+    inp.addEventListener('keydown', function(e){ if(e.key==='Escape') hide(); });
+    pop.addEventListener('mousedown', function(e){
+      var r=e.target.closest('.search-ex'); if(!r) return;
+      e.preventDefault();                              // keep focus; avoid blur-hide race
+      var q=r.getAttribute('data-q'); inp.value=q; state.q=q; render(); hide();
+    });
+  }
+  function profItem(p){
+    var it=document.createElement('div'); it.className='nav-item'+(state.view==='profile'&&p.id===state.profile?' active':'');
+    it.textContent=p.label;
+    it.onclick=function(){ pickProfile(p.id); }; return it;
+  }
+  function toggleGrp(elm,key){ if(expanded.has(key)){ expanded.delete(key); elm.classList.remove('open'); } else { expanded.add(key); elm.classList.add('open'); } }
+  function buildMobileNav(byCat){
+    var sel=document.getElementById('navSelect'); sel.innerHTML='';
+    var cg=document.createElement('optgroup'); cg.label='★ Composite';
+    SCOPES.forEach(function(sc){ var o=document.createElement('option'); o.value='scope:'+sc.k; o.textContent=sc.label+' Composite'; if(state.view==='composite'&&state.scope===sc.k)o.selected=true; cg.appendChild(o); });
+    sel.appendChild(cg);
+    FAMILIES.forEach(function(fam){
+      var profs=[]; fam.cats.forEach(function(cat){ (byCat[cat]||[]).forEach(function(p){ profs.push(p); }); });
+      if(!profs.length) return;
+      var og=document.createElement('optgroup'); og.label=fam.label;
+      profs.forEach(function(p){ var o=document.createElement('option'); o.value='id:'+p.id; o.textContent=p.label; if(state.view==='profile'&&state.profile===p.id)o.selected=true; og.appendChild(o); });
+      sel.appendChild(og);
+    });
+    if(D.docs && D.docs.c && D.docs.c.length){
+      var dg=document.createElement('optgroup'); dg.label=D.docs.t||'Knowledge Base';
+      (function walk(nodes,depth){ nodes.forEach(function(n){
+        var o=document.createElement('option'); o.value='doc:'+n.u;
+        o.textContent=new Array(depth+1).join('  ')+n.t; dg.appendChild(o);
+        if(n.c&&n.c.length) walk(n.c,depth+1);
+      }); })(D.docs.c,0);
+      sel.appendChild(dg);
+    }
+    sel.onchange=function(){ var v=sel.value; if(v.indexOf('doc:')===0){ pickDoc(v.slice(4)); } else if(v.indexOf('scope:')===0) pickScope(v.slice(6)); else pickProfile(v.slice(3)); };
+  }
+
+  // ── page search ─────────────────────────────────────────
+  // Searches the Knowledge Base (titles + full body text) and every
+  // leaderboard view. docs.js already ships the rendered HTML of every page,
+  // so the index is built from what is already in memory — no fetch, no
+  // prebuilt index file, no dependency. Built on the first keystroke and then
+  // cached — it is only ~5 ms over the whole corpus, but there is no reason to
+  // spend it on visitors who never search.
+  var SIDX=null, SIDX_HAS_DOCS=false, SHITS=[], SSEL=-1;
+
+  function buildSearchIndex(){
+    // Rebuild once the Knowledge Base arrives: search.js is fetched lazily, so
+    // an index built before it landed holds only profiles and views, and
+    // memoizing that would make the docs permanently unsearchable.
+    if(SIDX && (SIDX_HAS_DOCS || !window.LB_SEARCH)) return SIDX;
+    SIDX=[]; SIDX_HAS_DOCS=!!window.LB_SEARCH;
+    // Docs come from search.js — plain text prepared by the generator. They are
+    // real pages now (/docs/<id>/), so a hit navigates out rather than rendering
+    // in place; the entry carries its own crumb, so no tree walk is needed.
+    (window.LB_SEARCH || []).forEach(function(e){
+      var body=(e.d ? e.d + ' ' : '') + (e.x || '');
+      SIDX.push({ kind:'doc', title:e.t, crumb:e.c, body:body,
+                  tl:(e.t || '').toLowerCase(), bl:body.toLowerCase(),
+                  go:(function(id){ return function(){ pickDoc(id); }; })(e.u) });
+    });
+    D.profiles.forEach(function(p){
+      var body=p.blurb||'';
+      SIDX.push({ kind:'view', title:p.label, crumb:'Detailed Views › '+p.category, body:body,
+                  tl:(p.label+' '+p.id+' '+p.category).toLowerCase(), bl:body.toLowerCase(),
+                  go:function(){ pickProfile(p.id); } });
+    });
+    SCOPES.forEach(function(sc){
+      SIDX.push({ kind:'view', title:sc.label+' Composite', crumb:'Composite', body:'',
+                  tl:(sc.label+' composite').toLowerCase(), bl:'',
+                  go:function(){ pickScope(sc.k); } });
+    });
+    return SIDX;
+  }
+  // Every term must match somewhere (AND), title hits outrank body hits.
+  function searchPages(q){
+    var ql=q.toLowerCase(), terms=ql.split(/\s+/).filter(Boolean);
+    if(!terms.length) return [];
+    var out=[];
+    buildSearchIndex().forEach(function(e){
+      var score=0;
+      for(var i=0;i<terms.length;i++){
+        var t=terms[i], ti=e.tl.indexOf(t), bi=e.bl.indexOf(t);
+        if(ti<0 && bi<0) return;
+        score += ti===0 ? 60 : ti>0 ? 35 : 0;
+        if(bi>=0) score+=5;
+      }
+      if(e.tl===ql) score+=50;
+      if(e.kind==='view') score+=8;
+      out.push({e:e, score:score, term:terms[0]});
+    });
+    out.sort(function(a,b){ return b.score-a.score || a.e.title.length-b.e.title.length; });
+    return out.slice(0,25);
+  }
+  function snippet(body, term){
+    if(!body) return '';
+    var i=body.toLowerCase().indexOf(term);
+    if(i<0) return esc(body.slice(0,110))+(body.length>110?'…':'');
+    var s=Math.max(0,i-45), e=Math.min(body.length,i+term.length+75);
+    return (s>0?'…':'')+esc(body.slice(s,i))+'<mark>'+esc(body.slice(i,i+term.length))+'</mark>'
+          +esc(body.slice(i+term.length,e))+(e<body.length?'…':'');
+  }
+  function renderSearch(q){
+    var box=document.getElementById('navResults'), tree=document.getElementById('navTree'),
+        inp=document.getElementById('navq');
+    if(!q){
+      SHITS=[]; SSEL=-1; box.style.display='none'; box.innerHTML='';
+      tree.style.display=''; inp.setAttribute('aria-expanded','false'); return;
+    }
+    SHITS=searchPages(q); SSEL=SHITS.length?0:-1;
+    tree.style.display='none'; box.style.display=''; inp.setAttribute('aria-expanded','true');
+    if(!SHITS.length){ box.innerHTML='<div class="nav-empty">No page matches <b>'+esc(q)+'</b>.</div>'; return; }
+    var h='<div class="nav-res-h"><span>Pages</span><span>'+SHITS.length+(SHITS.length===25?'+':'')+'</span></div>';
+    SHITS.forEach(function(hit,i){
+      var e=hit.e, sn=e.kind==='doc' ? snippet(e.body,hit.term) : esc(e.body||'');
+      h+='<button type="button" class="nav-res'+(i===SSEL?' sel':'')+'" role="option" data-i="'+i+'"'
+        +' aria-selected="'+(i===SSEL)+'"><span class="nav-res-t">'+esc(e.title)+'</span>'
+        +'<span class="nav-res-c">'+esc(e.crumb)+'</span>'
+        +(sn?'<span class="nav-res-s">'+sn+'</span>':'')+'</button>';
+    });
+    box.innerHTML=h;
+  }
+  function moveSel(d){
+    if(!SHITS.length) return;
+    SSEL=(SSEL+d+SHITS.length)%SHITS.length;
+    Array.prototype.forEach.call(document.querySelectorAll('#navResults .nav-res'), function(el,i){
+      var on=(i===SSEL); el.classList.toggle('sel',on); el.setAttribute('aria-selected',on);
+      if(on && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+    });
+  }
+  function clearSearch(){
+    var inp=document.getElementById('navq'); if(inp) inp.value='';
+    renderSearch('');
+  }
+  // Clear before navigating: pickDoc/pickProfile rebuild the tree, and the
+  // user should land back on a normal menu showing where they now are.
+  function openSel(i){ var hit=SHITS[i]; if(!hit) return; var go=hit.e.go; clearSearch(); go(); }
+  // The Knowledge Base index is only needed by this box, so it is fetched the
+  // first time the box is used and never on a visit that ignores it.
+  // The callback re-reads the input rather than closing over the query it was
+  // created with: on a slow connection the box can be cleared before search.js
+  // lands, and a captured string would re-open the panel with results for a
+  // query that is no longer there.
+  var _searchReq=null, _searchCb=null;
+  function ensureSearch(cb){
+    if(window.LB_SEARCH){ if(cb) cb(); return; }
+    _searchCb=cb;
+    if(_searchReq) return;
+    _searchReq=document.createElement('script'); _searchReq.src='search.js';
+    _searchReq.onload=function(){ var f=_searchCb; _searchCb=null; if(f) f(); };
+    // Run the callback anyway: buildSearchIndex() still indexes the profiles
+    // and composite views from LB_DATA, so the box keeps working without the
+    // Knowledge Base instead of silently returning nothing forever.
+    _searchReq.onerror=function(){ _searchReq=null; var f=_searchCb; _searchCb=null; if(f) f(); };
+    document.head.appendChild(_searchReq);
+  }
+  function initNavSearch(){
+    var inp=document.getElementById('navq'), box=document.getElementById('navResults');
+    if(!inp||!box) return;
+    var t;
+    inp.addEventListener('focus', function(){ ensureSearch(null); }, {once:true});
+    inp.addEventListener('input', function(){
+      clearTimeout(t); var v=inp.value.trim();
+      t=setTimeout(function(){ if(!v) renderSearch(v); else ensureSearch(function(){ renderSearch(inp.value.trim()); }); }, 90);
+    });
+    inp.addEventListener('keydown', function(e){
+      if(e.key==='ArrowDown'){ e.preventDefault(); moveSel(1); }
+      else if(e.key==='ArrowUp'){ e.preventDefault(); moveSel(-1); }
+      else if(e.key==='Enter'){ e.preventDefault(); openSel(SSEL); }
+      else if(e.key==='Escape'){ e.preventDefault(); clearSearch(); inp.blur(); }
+    });
+    box.addEventListener('click', function(e){
+      var b=e.target.closest?e.target.closest('.nav-res'):null; if(!b) return;
+      openSel(parseInt(b.getAttribute('data-i'),10));
+    });
+  }
+
+  function pickScope(scope){
+    state.view='composite'; state.scope=scope; state.sortKey='score'; state.sortDir=-1; state.q=''; state.lang=''; document.getElementById('q').value='';
+    expanded.add('composite');
+    buildNav(); renderHead(); render();
+  }
+  function pickProfile(id){
+    var p=PROF[id]; if(!p) return;
+    var ds=defProfileSort(id);
+    state.view='profile'; state.profile=id; state.conns=p.conns[0]; state.sortKey=ds.k; state.sortDir=ds.d; state.q=''; document.getElementById('q').value='';
+    expanded.add('detailed'); expanded.add(familyOf(p));
+    buildNav(); renderHead(); render();
+  }
+
+  // ── head ─────────────────────────────────────────────────
+  // Slide the segmented-control thumb under the active button (measured live,
+  // so it's robust to border/padding).
+  function moveThumb(seg){
+    var b=seg.querySelector('button.on'), t=seg.querySelector('.seg-thumb');
+    if(!b||!t) return;
+    var sr=seg.getBoundingClientRect(), br=b.getBoundingClientRect();
+    t.style.width=br.width+'px';
+    t.style.transform='translateX('+(br.left-sr.left-seg.clientLeft)+'px)';
+  }
+  function setSegActive(seg,b){
+    Array.prototype.forEach.call(seg.querySelectorAll('button'),function(x){ x.classList.toggle('on', x===b); });
+    moveThumb(seg);
+  }
+  function renderHead(){
+    if(state.view==='doc') return;
+    var cat=document.getElementById('pcat'), title=document.getElementById('ptitle'),
+        blurb=document.getElementById('pblurb'), ctl=document.getElementById('headctl');
+    if(state.view==='composite'){
+      var sLabel={h1:'all HTTP/1.1 profiles',h2:'all HTTP/2 profiles',h3:'all HTTP/3 profiles',gw:'the gateway & production-stack profiles',grpc:'all gRPC profiles',ws:'all WebSocket profiles'}[state.scope];
+      // The heading is the page's <h1>. "HTTP/1.1" alone said nothing about
+      // what is on the page, so every view names its subject.
+      var sName={h1:'HTTP/1.1 web server benchmarks',h2:'HTTP/2 web server benchmarks',h3:'HTTP/3 web server benchmarks',gw:'Gateway and production stack benchmarks',grpc:'gRPC server benchmarks',ws:'WebSocket server benchmarks'}[state.scope];
+      cat.textContent='Composite ranking'; title.textContent=sName;
+      blurb.innerHTML='Normalized score summed across '+sLabel+' (each profile worth 100 to its leader'
+        +(state.rescale?' among the frameworks shown':' in the full field, so filtering does not change the numbers')
+        +'), per framework type. Higher is better. <a href="/docs/scoring/composite-score/">How it works →</a>';
+      ctl.innerHTML='';
+      var t=document.createElement('div'); t.className='toggle'+(state.useMem?' on':'');
+      t.innerHTML='<span class="sw"><i></i></span> Memory efficiency';
+      t.onclick=function(){ state.useMem=!state.useMem; t.classList.toggle('on', state.useMem); render(); };
+      ctl.appendChild(t);
+      var rs=document.createElement('div'); rs.className='toggle'+(state.rescale?' on':'');
+      rs.innerHTML='<span class="sw"><i></i></span> Rescale to selection';
+      rs.setAttribute('data-tip','Off: each profile is worth 100 to the best entry in the whole field, so scores stay comparable while you filter. On: rescale to the frameworks currently shown, to compare a subset against itself.');
+      rs.onclick=function(){ state.rescale=!state.rescale; rs.classList.toggle('on', state.rescale); render(); };
+      ctl.appendChild(rs);
+      // Arriving on #lang=X (from a language rank badge) filters the board to
+      // one language. Say so, and make it one click to leave - a filter with no
+      // visible cause reads as missing data.
+      if(state.lang){
+        var lf=document.createElement('div'); lf.className='toggle on';
+        lf.innerHTML='<span class="sw"><i></i></span> '+esc(state.lang)+' only';
+        lf.setAttribute('data-tip','Showing only '+esc(state.lang)+' entries. Click to show every language again.');
+        lf.onclick=function(){ state.lang=''; renderHead(); render(); };
+        ctl.appendChild(lf);
+      }
+    } else {
+      var p=PROF[state.profile];
+      cat.textContent=p.category; title.textContent=p.label+' benchmark';
+      var b=esc(p.blurb||'');
+      if(p.doc) b+=(b?' ':'')+'<a href="/docs/'+p.doc+'/">Implementation guidelines →</a>';
+      blurb.innerHTML=b;
+      var seg=document.createElement('div'); seg.className='seg';
+      var thumb=document.createElement('div'); thumb.className='seg-thumb'; seg.appendChild(thumb);
+      p.conns.forEach(function(c){
+        var b=document.createElement('button'); b.textContent=c.toLocaleString('en-US')+'c';
+        if(c===state.conns) b.className='on';
+        b.onclick=function(){ state.conns=c; setSegActive(seg,b); render(); };
+        seg.appendChild(b);
+      });
+      ctl.innerHTML=''; ctl.appendChild(seg);
+      thumb.style.transition='none'; moveThumb(seg);           // position without an initial slide
+      requestAnimationFrame(function(){ thumb.style.transition=''; });
+    }
+  }
+
+  // ── columns ──────────────────────────────────────────────
+  function cols(){
+    if(state.view==='composite') return [
+      {k:'rank',label:'#'},{k:'fw',label:'Framework'},
+      {k:'score',label:'Score',num:true},{k:'counted',label:'Profiles',num:true}
+    ];
+    return [
+      {k:'rank',label:'#'},{k:'fw',label:'Framework'},{k:'rps',label:'Requests / sec',num:true},{k:'bw',label:'Bandwidth',num:true,cls:'col-bw'},
+      {k:'avg',label:'Avg',num:true,cls:'col-avg'},{k:'p99',label:'p99',num:true},
+      {k:'cpu',label:'CPU %',num:true,cls:'col-cpu'},{k:'mem',label:'Mem',num:true,cls:'col-mem'}
+    ];
+  }
+  // Profile-grid columns are defined by the CSS .grid rule + media queries.
+  function renderHeadCols(){
+    var th=document.getElementById('thead'); th.innerHTML='';
+    cols().forEach(function(c){
+      var d=document.createElement('div');
+      d.className='th'+(c.num?' num':'')+(c.cls?' '+c.cls:'')+(state.sortKey===c.k?' sorted':'');
+      if(c.k==='rank'){ d.textContent='#'; th.appendChild(d); return; }
+      var ar=state.sortKey===c.k?(state.sortDir<0?'▼':'▲'):'';
+      d.innerHTML=esc(c.label)+' <span class="ar">'+ar+'</span>';
+      if(TIP[c.k]) d.setAttribute('data-tip', TIP[c.k]);
+      d.onclick=function(){ sortBy(c.k); }; th.appendChild(d);
+    });
+  }
+  function sortBy(k){
+    if(state.sortKey===k){ state.sortDir=-state.sortDir; }
+    else { state.sortKey=k; state.sortDir = (k==='fw') ? 1 : (state.view==='composite') ? -1 : (k==='rps') ? -1 : 1; }
+    render();
+  }
+
+  // ── type filter chips ───────────────────────────────────
+  // Sync the global top-bar type filter's active state (called each render).
+  function renderTypes(){
+    var tf=document.getElementById('typeFilter');
+    Array.prototype.forEach.call(tf.querySelectorAll('button[data-type]'), function(b){ b.classList.toggle('on', state.types.indexOf(b.getAttribute('data-type'))>=0); });
+    var tb=document.getElementById('tunedToggle'); if(tb) tb.classList.toggle('on', state.showTuned);
+  }
+  function saveTypes(){ try{ localStorage.setItem('lb-types', JSON.stringify(state.types)); }catch(e){} }
+  function saveTuned(){ try{ localStorage.setItem('lb-showtuned', state.showTuned?'1':'0'); }catch(e){} }
+  function saveCompactFw(){ try{ localStorage.setItem('lb-fwcompact', state.compactFw?'1':'0'); }catch(e){} }
+  function toggleCompactFw(){ state.compactFw=!state.compactFw; saveCompactFw(); render(); scheduleHash(); }
+  // flagship/emerging/experimental combine (one framework pool); engine and
+  // infrastructure are exclusive - each is its own league, selected alone.
+  // Never empty.
+  var EXCLUSIVE_TYPES=['engine','infrastructure'];
+  function isExclusiveType(t){ return EXCLUSIVE_TYPES.indexOf(t)>=0; }
+  function toggleType(t){
+    var s=state.types.slice();
+    if(isExclusiveType(t)){ s=[t]; }
+    else if(s.some(isExclusiveType)){ s=[t]; }
+    else { var i=s.indexOf(t); if(i>=0){ if(s.length>1) s.splice(i,1); } else { s.push(t); } }
+    state.types=s; saveTypes(); render();
+  }
+
+  // ── COMPOSITE scoring (mirrors the canonical board) ─────
+  // Completeness: the four things a framework can do for you between an
+  // arriving request and a finished response - route it, run middleware around
+  // the handler, hand the request over already made (path and query parameters,
+  // a body buffered or streamed) and build the response. Each one an entry does
+  // not do costs it 2.5%, so the factor runs from x1.00 down to x0.90. It scales
+  // the whole composite rather than any single profile, because it is a
+  // property of the entry and not of a workload.
+  //
+  // There is deliberately no bonus half. Doing the work a framework exists to
+  // do is the baseline, not a credit: the factor exists so a bare request
+  // callback cannot out-rank a real framework on throughput it only has because
+  // it does less. Nothing outside that request-to-response path counts - not
+  // templating, not an ORM, not the ecosystem.
+  //
+  // Only the framework tiers are graded. Engine and infrastructure entries
+  // implement none of the four - a raw-socket server has no router, a proxy has
+  // no handler to run middleware around - which is why grading them is pointless
+  // rather than generous: they would all take the same x0.90, leaving their
+  // order untouched, and outOfLeague already keeps them from being normalized
+  // against frameworks. So their factor is fixed at 1.
+  //
+  // Named positively rather than through isExclusiveType() so a future
+  // exclusive tier defaults to ungraded, and so the orphan `production` type
+  // scores neutral instead of being penalised.
+  var CMP_TYPES=['flagship','emerging','experimental'];
+  var CMP_AXES=['routing','middleware','request','response'];
+  // The four axes are the path from an arriving HTTP request to a finished
+  // response, so they only mean something on a board measuring that path. A
+  // WebSocket echo has no route to match, no body to hand over and no response
+  // to build - the handshake happened once and everything after it is frames -
+  // and a gRPC call has all four, but the generated stub does them, not the
+  // framework. On those two boards the factor is 1 for every entry, including
+  // the 27 that also serve HTTP: what is being measured there is not the thing
+  // the grade is about.
+  var CMP_SCOPES_OUT=['ws','grpc'];
+  function cmpInScope(){ return CMP_SCOPES_OUT.indexOf(state.scope)<0; }
+  // Only an explicit false costs anything. An axis left undeclared reads as
+  // done, so an entry submitted before the field existed is ungraded rather
+  // than assumed to be missing all four, and `{middleware:false}` is the whole
+  // declaration for an entry that only lacks middleware.
+  function cmpDecl(fw){ var c=D.meta[fw]&&D.meta[fw].cmp; return (c&&typeof c==='object')?c:null; }
+  function cmpMissing(fw){
+    var c=cmpDecl(fw); if(!c) return [];
+    return CMP_AXES.filter(function(a){ return c[a]===false; });
+  }
+  function cmpFactor(fw){
+    if(!cmpInScope() || CMP_TYPES.indexOf(typeOf(fw))<0) return 1;
+    return 1-0.025*cmpMissing(fw).length;
+  }
+  // Which profiles count toward the composite, per league. Frameworks use the
+  // global `scored` flag, engines `engineScored`, infrastructure `infraScored`.
+  //
+  // Infrastructure is the one league whose set is not a subset of the framework
+  // set: proxies are scored on Pipelined, which frameworks treat as
+  // reference-only (#1058). So its flag is read on its own rather than behind
+  // the `scored` short-circuit the way engineScored is - gating it would drop
+  // the profile from the infra composite without anything saying so.
+  function scoredForType(pid,t){
+    var p=PROF[pid]; if(!p) return false;
+    if(t==='infrastructure') return !!p.infraScored;
+    if(p.scored===false) return false;
+    if(t==='engine') return !!p.engineScored;
+    return true;
+  }
+  function isScored(pid,fw){ return scoredForType(pid, typeOf(fw)); }
+  // The league the current view ranks. The exclusive types name themselves; any
+  // framework selection shares the one framework scored set.
+  function leagueType(){ for(var i=0;i<EXCLUSIVE_TYPES.length;i++){ if(state.types.indexOf(EXCLUSIVE_TYPES[i])>=0) return EXCLUSIVE_TYPES[i]; } return 'flagship'; }
+  function aggregate(){
+    // avg rps/mem/bw over each profile's scored conns.
+    var avg={},amem={},abw={};
+    D.profiles.forEach(function(p){
+      // Reference-only profiles (scored:false — pipelined, fortunes) aggregate
+      // too: they render as faded columns in the matrix, they just never enter
+      // the framework composite sum (#1058). Load-bearing for infrastructure,
+      // whose composite does count Pipelined — scoredForType() can only pick a
+      // profile up if there is an average here for it.
+      var pid=p.id, sums={},ms={},bs={},cn={};
+      p.scoredConns.forEach(function(c){
+        (D.results[pid+'-'+c]||[]).forEach(function(r){
+          var fw=r.fw; sums[fw]=(sums[fw]||0)+(r.rps||0); cn[fw]=(cn[fw]||0)+1;
+          ms[fw]=(ms[fw]||0)+mem(r.memory); bs[fw]=(bs[fw]||0)+bw(r.bandwidth);
+        });
+      });
+      avg[pid]={};amem[pid]={};abw[pid]={};
+      Object.keys(sums).forEach(function(fw){ var c=cn[fw]; avg[pid][fw]=sums[fw]/c; amem[pid][fw]=ms[fw]/c; abw[pid][fw]=bs[fw]/c; });
+    });
+    return {avg:avg,mem:amem,bw:abw};
+  }
+  var AGG=null;
+  function computeComposite(){
+    if(!AGG) AGG=aggregate();
+    var A=AGG, useMem=state.useMem;
+    var pids=[]; D.profiles.forEach(function(p){ if(state.scope==='all'||familyOf(p)===state.scope) pids.push(p.id); });
+    // Scored columns first, reference-only ones after, each keeping its catalog
+    // order. Reading left to right then follows the score: everything before the
+    // break is in the sum, everything after it is context.
+    //
+    // Decided here rather than by reordering the catalog, because which columns
+    // are reference-only is a property of the league being shown, not of the
+    // profile. Infrastructure scores Pipelined and the framework leagues do not,
+    // so a fixed order would have to be wrong for one of them.
+    var _lt=leagueType(), _scored=[], _ref=[];
+    pids.forEach(function(pid){ (scoredForType(pid,_lt)?_scored:_ref).push(pid); });
+    pids=_scored.concat(_ref);
+    // Two different questions, previously answered by one predicate:
+    //
+    //   outOfLeague — is this entry ranked somewhere else entirely? Types are
+    //                 separate leagues: engine entries are scored on their own
+    //                 subset of profiles, so a framework's 100 should never be
+    //                 set by an engine's result.
+    //   hidden      — is it merely filtered out of view right now? The search
+    //                 box and the tuned toggle are display filters.
+    //
+    // Normalizing over `hidden` entries too is what keeps a score stable: with
+    // it, filtering to one language re-based every profile on the best entry of
+    // that language, and because each profile moved by a different factor the
+    // summed ranking could reorder (#702 — Rage above Roda overall, below it
+    // once filtered to Ruby). The `rescale` toggle restores that behaviour for
+    // when comparing a subset against itself is the point.
+    function outOfLeague(fw){ return state.types.indexOf(typeOf(fw))<0; }
+    function hidden(fw){ if(!state.showTuned && modeOf(fw)==='tuned') return true; if(state.lang && langOf(fw)!==state.lang) return true; return !matchQ(fw); }
+    function excl(fw){ return outOfLeague(fw) || hidden(fw); }
+    var exclFromScale = state.rescale ? excl : outOfLeague;
+    var minBpr=null;
+    if(pids.indexOf('json-comp')>=0 && A.avg['json-comp']){ var mv=Infinity; Object.keys(A.avg['json-comp']).forEach(function(fw){ if(exclFromScale(fw))return; var rps=A.avg['json-comp'][fw]||0,b=A.bw['json-comp'][fw]||0; if(rps>0&&b>0){var bpr=b/rps; if(bpr<mv)mv=bpr;} }); if(mv<Infinity)minBpr=mv; }
+    function eff(pid,fw){
+      var rps=(A.avg[pid]&&A.avg[pid][fw])||0; if(rps<=0) return 0;
+      if(pid==='json-comp'&&minBpr!=null){ var b=A.bw[pid][fw]||0; if(b>0) return rps*Math.pow(minBpr/(b/rps),2); }
+      return rps;
+    }
+    var maxR={},maxME={},maxLat={};
+    pids.forEach(function(pid){ maxR[pid]=0; maxME[pid]=0; maxLat[pid]=0; Object.keys(A.avg[pid]||{}).forEach(function(fw){ if(exclFromScale(fw))return; var e=eff(pid,fw); if(e>maxR[pid])maxR[pid]=e; var rps=A.avg[pid][fw]||0,m=A.mem[pid][fw]||0; if(m>0&&rps>0){var me=Math.sqrt(rps)/m; if(me>maxME[pid])maxME[pid]=me;} if(isLatProfile(pid)){ var ls=latScore(pid,fw); if(ls>maxLat[pid])maxLat[pid]=ls; } }); });
+    var fwset={}; pids.forEach(function(pid){ Object.keys(A.avg[pid]||{}).forEach(function(fw){fwset[fw]=1;}); });
+    var rows=[];
+    Object.keys(fwset).forEach(function(fw){
+      if(excl(fw)) return;
+      var cells={}, sum=0, any=false;
+      pids.forEach(function(pid){
+        var rps=(A.avg[pid]&&A.avg[pid][fw])||0;
+        if(rps>0 && maxR[pid]>0){ any=true;
+          var sc;
+          if(isLatProfile(pid)){
+            // The rate is pinned on this profile, so normalising it on rps puts
+            // every entry that held the rate at 1000 and the column says nothing.
+            // Its own 0-100 score, built from cost and both latency tails, is
+            // what the cell ranks on instead. No memory bonus: the value is not
+            // a throughput for the bonus to scale.
+            //
+            // Normalised against the leading score in the field, exactly as the
+            // rps profiles are normalised against the leading rps, so the column
+            // leader is worth 1000 here too. A flat x10 was the old behaviour and
+            // it quietly capped this column below every other one: nobody is
+            // simultaneously cheapest on CPU and best on both tails, so the best
+            // entry scored in the low 90s and the column could never contribute
+            // its full 1000 the way an rps column does.
+            sc=maxLat[pid]>0?(latScore(pid,fw)/maxLat[pid])*1000:0;
+          } else {
+            // 0-1000 per profile, not 0-100. At 24 scored profiles a 0-100
+            // basis put whole clusters of entries on the same rounded total,
+            // and the extra digit is free: nothing about the ranking changes,
+            // only how finely it can be read.
+            sc=(eff(pid,fw)/maxR[pid])*1000;
+            if(useMem && maxME[pid]>0){ var m=A.mem[pid][fw]||0; if(m>0) sc+=(Math.sqrt(rps)/m/maxME[pid])*1000*0.5; }
+          }
+          var counts=isScored(pid,fw);
+          // `score` is set only where the cell must not print rps. Everywhere
+          // else it stays null and the renderer keeps showing throughput.
+          cells[pid]={v:sc, c:counts, rps:rps, mem:(A.mem[pid][fw]||0),
+                      score:(isLatProfile(pid)?sc:null)};
+          if(counts) sum+=sc;
+        }
+      });
+      if(any) rows.push({fw:fw, lang:langOf(fw), score:sum*cmpFactor(fw), raw:sum,
+                         miss:cmpMissing(fw), dec:!!cmpDecl(fw), cells:cells});
+    });
+    // per-profile max score → normalize the per-cell quality bar so it adapts when the memory toggle lifts the ceiling above 100
+    var maxV={}; pids.forEach(function(pid){ maxV[pid]=0; });
+    rows.forEach(function(r){ pids.forEach(function(pid){ var c=r.cells[pid]; if(c && c.v>maxV[pid]) maxV[pid]=c.v; }); });
+    rows.forEach(function(r){ pids.forEach(function(pid){ var c=r.cells[pid]; if(c){ c.bar=maxV[pid]>0?(c.v/maxV[pid])*100:0; c.best=maxV[pid]>0 && c.v>=maxV[pid]-0.05; } }); });
+    return {pids:pids, rows:rows};
+  }
+
+  // ── render ──────────────────────────────────────────────
+  // Why a row scored what it did. The completeness factor is the one part of
+  // the composite that is not read off a benchmark, so it is always shown with
+  // the raw sum it was applied to rather than folded silently into one number.
+  // Only the framework tiers carry the factor at all. An engine or a reverse
+  // proxy is not unassessed, it is out of scope for the question, so its row
+  // says nothing about completeness rather than reporting a clean sheet it was
+  // never given.
+  function cmpGraded(fw){ return cmpInScope() && CMP_TYPES.indexOf(typeOf(fw))>=0; }
+  // Four bands rather than a continuous ramp.
+  //
+  // A gradient asks the eye to read a value off a hue, which it cannot do: with
+  // five stops interpolated, 62% and 74% are two barely different yellow-greens
+  // and the column stops being scannable. It also spent most of its hues on a
+  // range almost nothing occupies - measured over all 1,650 published cells the
+  // distribution is bimodal, 24% of them under 10% of their column leader and
+  // 22% over 90%, median 27%.
+  //
+  // Four steps, one hue each, so a cell has a band rather than a shade and the
+  // legend beside the toggle says what each one means.
+  var HEAT_BANDS=[
+    [0.25, 'rgb(198,60,48)',  'under 25%'],
+    [0.50, 'rgb(228,126,30)', '25-50%'],
+    [0.75, 'rgb(226,192,44)', '50-75%'],
+    [1.01, 'rgb(45,172,94)',  'over 75%']
+  ];
+  // Six points and a base, filled rather than stroked: a stroked outline closes
+  // up at this size and reads as a smudge. Gold is the token the board already
+  // uses for a first place in the rank column.
+  var CROWN_SVG='<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M3.2 17.6 1.7 6.4 7.6 11 12 3.8 16.4 11 22.3 6.4 20.8 17.6Z"/>'
+    + '<rect x="3.2" y="18.6" width="17.6" height="2.2"/></svg>';
+  function heatColor(t){
+    t=(!isFinite(t)||t<0)?0:(t>1?1:t);
+    for(var i=0;i<HEAT_BANDS.length;i++) if(t<HEAT_BANDS[i][0]) return HEAT_BANDS[i][1];
+    return HEAT_BANDS[HEAT_BANDS.length-1][1];
+  }
+
+  function cmpTip(r){
+    if(!cmpGraded(r.fw)) return 'composite '+r.score.toFixed(1);
+    if(!r.dec) return 'composite '+r.score.toFixed(1)+' - completeness not assessed yet, so nothing is deducted (x1.00)';
+    if(!r.miss.length) return 'composite '+r.score.toFixed(1)+' - routing, middleware, request and response all covered, so nothing is deducted (x1.00)';
+    return 'composite '+r.score.toFixed(1)+' = '+r.raw.toFixed(1)+' raw x '+cmpFactor(r.fw).toFixed(3)
+         + ' - no '+r.miss.join(', no ')+' (-2.5% each)';
+  }
+  // The points the completeness factor took off, shown only where it took any.
+  //
+  // This used to print (0) on every assessed row, on the argument that a figure
+  // appearing only on penalised rows reads as a mark against them. In practice
+  // it was the other way round: 89 of the 114 assessed entries lose nothing, so
+  // (0) was noise on the large majority of rows and the ones that actually lost
+  // points had to be picked out of it. Nothing deducted, nothing said.
+  //
+  // What that gives up is the at-a-glance difference between "assessed, nothing
+  // deducted" and "not assessed yet" - both are a bare score now. They are still
+  // different claims, and the tooltip still tells them apart in words, which is
+  // where that distinction was really being carried anyway.
+  //
+  // Taken off the displayed figures rather than the exact ones, so what is on
+  // screen always reconciles: 416 (-22) never sits next to a raw 438.4. The
+  // factor is at most 1, so d is never positive and already carries its sign.
+  function cmpDelta(r){
+    if(!cmpGraded(r.fw) || !r.dec) return '';
+    var d=Math.round(r.score)-Math.round(r.raw);
+    if(!d) return '';
+    return '<span class="cmp pen">('+d+')</span>';
+  }
+  function render(){
+    var th=document.getElementById('thead');
+    var mn=document.querySelector('.main');
+    var dv=document.getElementById('docview'), grid=document.getElementById('grid'),
+        tools=document.querySelector('.tools'), phead=document.querySelector('.phead'),
+        seo=document.getElementById('boardSeo');
+    if(state.view==='doc'){
+      if(mn)mn.classList.remove('cmfull');
+      if(grid)grid.style.display='none'; if(tools)tools.style.display='none'; if(phead)phead.style.display='none';
+      if(seo)seo.style.display='none';
+      if(dv){ dv.style.display=''; renderDoc(dv); }
+      renderTypes(); scheduleHash(); return;
+    }
+    if(dv)dv.style.display='none';
+    if(grid)grid.style.display=''; if(tools)tools.style.display=''; if(phead)phead.style.display='';
+    syncHeatCtl();
+    if(seo)seo.style.display='';
+    if(state.view==='composite'){ th.style.display='none'; if(mn)mn.classList.add('cmfull'); renderComposite(); }
+    else { th.style.display=''; if(mn)mn.classList.remove('cmfull'); renderProfile(); }
+    scheduleHash();
+  }
+  function renderDoc(dv){
+    var d=LB_DOCS[state.doc];
+    if(!d){ dv.innerHTML='<div class="doc-wrap"><p class="empty">Page not found.</p></div>'; return; }
+    dv.innerHTML='<article class="doc-wrap"><h1 class="doc-title">'+esc(d.t)+'</h1>'+d.html+'</article>';
+  }
+  // ── deep linking via URL hash ───────────────────────────
+  function writeHash(){
+    if(state.view==='doc'){
+      var dh='#doc='+state.doc;
+      if(location.hash!==dh){ try{ history.replaceState(null,'', dh); }catch(e){} }
+      return;
+    }
+    var p=[];
+    if(state.view==='profile'){ p.push('p='+state.profile); p.push('conns='+state.conns); }
+    else { if(state.scope!=='h1') p.push('scope='+state.scope); if(state.useMem) p.push('mem=1'); if(state.rescale) p.push('rescale=1'); if(state.heat) p.push('heat=1'); }
+    var _dps=defProfileSort(state.profile);
+    var defSort = state.view==='profile' ? (state.sortKey===_dps.k&&state.sortDir===_dps.d) : (state.sortKey==='score'&&state.sortDir===-1);
+    if(!defSort) p.push('sort='+state.sortKey+':'+state.sortDir);
+    var ts=state.types.slice().sort().join(','); if(ts!=='emerging,flagship') p.push('type='+ts);
+    if(!state.showTuned) p.push('tuned=0');
+    if(state.compactFw) p.push('fw=compact');
+    if(state.lang) p.push('lang='+encodeURIComponent(state.lang));
+    if(state.q) p.push('q='+encodeURIComponent(state.q));
+    var nh=p.length?('#'+p.join('&')):'';
+    if(location.hash!==nh){ try{ history.replaceState(null,'', nh||(location.pathname+location.search)); }catch(e){} }
+  }
+  var _hashT; function scheduleHash(){ clearTimeout(_hashT); _hashT=setTimeout(writeHash,80); }
+  function restoreFromHash(){
+    var h=location.hash.slice(1); if(!h) return;
+    var p={}; h.split('&').forEach(function(s){ var i=s.indexOf('='); if(i>0) p[s.slice(0,i)]=decodeURIComponent(s.slice(i+1)); });
+    if(p.doc){ location.replace(docUrl(p.doc)); return; }   // legacy #doc=x bookmark -> /docs/x/
+    if(p.type){ var ts=p.type.split(',').filter(Boolean); if(ts.length) state.types=ts; }
+    if(p.hasOwnProperty('tuned')) state.showTuned = p.tuned!=='0';
+    if(p.hasOwnProperty('fw')) state.compactFw = p.fw==='compact';
+    state.lang = p.lang || '';
+    state.q = p.q || '';
+    if(p.p && PROF[p.p]){
+      state.view='profile'; state.profile=p.p;
+      var cc=+p.conns; state.conns=(PROF[p.p].conns.indexOf(cc)>=0)?cc:PROF[p.p].conns[0];
+      var _ds=defProfileSort(state.profile); state.sortKey=_ds.k; state.sortDir=_ds.d;
+      expanded.add('detailed'); expanded.add(familyOf(PROF[p.p]));
+    } else {
+      state.view='composite';
+      state.scope=(p.scope && SCOPES.some(function(s){return s.k===p.scope;}))?p.scope:'h1';
+      state.useMem = p.mem==='1';
+      state.rescale = p.rescale==='1';
+      state.sortKey='score'; state.sortDir=-1;
+      expanded.add('composite');
+    }
+    if(p.sort){ var sp=p.sort.split(':'); if(sp[0]){ state.sortKey=sp[0]; state.sortDir=(+sp[1]===1)?1:-1; } }
+    var q=document.getElementById('q'); if(q) q.value=state.q;
+  }
+
+  function scoreColor(s){ return s>=85?'#16a34a':s>=70?'#65a30d':s>=50?'#ca8a04':s>=30?'#ea580c':'#dc2626'; }
+  var ICON_END='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 18 6-6-6-6"/><path d="M17 6v12"/></svg>';
+  var ICON_START='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 18-6-6 6-6"/><path d="M7 6v12"/></svg>';
+  function updateEndBtn(){
+    var wrap=document.getElementById('cwrap'); if(!wrap) return;
+    var atEnd=wrap.scrollLeft >= (wrap.scrollWidth-wrap.clientWidth)-2;
+    ['cscrollEnd','cscrollEndTop'].forEach(function(id){
+      var btn=document.getElementById(id); if(!btn) return;
+      btn.innerHTML=atEnd?ICON_START:ICON_END;
+      btn.title=atEnd?'Scroll to start':'Scroll to end';
+    });
+  }
+  function syncTopScroll(){
+    var top=document.getElementById('cscrollTop'), wrap=document.getElementById('cwrap'); if(!top||!wrap) return;
+    var tbl=wrap.querySelector('table'), bar=top.firstElementChild;
+    if(tbl&&bar) bar.style.width=tbl.scrollWidth+'px';
+    var show=(wrap.scrollWidth>wrap.clientWidth+1)?'':'none';
+    var rb=document.getElementById('cscrollRow'), rt=document.getElementById('cscrollRowTop');
+    if(rb) rb.style.display=show; if(rt) rt.style.display=show;
+    updateEndBtn();
+  }
+  function setupTopScroll(){
+    var top=document.getElementById('cscrollTop'), wrap=document.getElementById('cwrap'); if(!top||!wrap) return;
+    var prog=false;  // true during a programmatic smooth-scroll, so the bar->table mirror doesn't cancel it
+    top.onscroll=function(){ if(prog) return; wrap.scrollLeft=top.scrollLeft; };
+    wrap.onscroll=function(){ top.scrollLeft=wrap.scrollLeft; updateEndBtn(); };
+    function jump(){
+      var max=wrap.scrollWidth-wrap.clientWidth, atEnd=wrap.scrollLeft>=max-2;
+      prog=true; wrap.scrollTo({left:atEnd?0:max, behavior:'smooth'}); setTimeout(function(){ prog=false; }, 700);
+    }
+    var b1=document.getElementById('cscrollEnd'); if(b1) b1.onclick=jump;
+    var b2=document.getElementById('cscrollEndTop'); if(b2) b2.onclick=jump;
+    syncTopScroll();
+  }
+  function renderComposite(){
+    var res=computeComposite(), pids=res.pids, rows=res.rows.slice();
+    renderTypes(rows.map(function(r){return r.fw;}));
+    var rankMap={}; rows.slice().sort(function(a,b){return b.score-a.score;}).forEach(function(r,i){rankMap[r.fw]=i+1;});
+    var maxScore=Math.max.apply(null, rows.map(function(r){return r.score;}).concat([1]));
+    var dark=DARK();
+    var sk=state.sortKey, dir=state.sortDir;
+    rows.sort(function(a,b){
+      if(sk==='fw'){ var x=a.fw.toLowerCase(),y=b.fw.toLowerCase(); return x<y?-dir:x>y?dir:0; }
+      if(sk==='score'){ return (a.score-b.score)*dir; }
+      var av=(a.cells[sk]&&a.cells[sk].v)||0, bv=(b.cells[sk]&&b.cells[sk].v)||0;
+      return (av-bv)*dir || (b.score-a.score);
+    });
+    document.getElementById('count').textContent=rows.length+(rows.length===1?' framework':' frameworks');
+    var ar=function(k){ return sk===k?(dir<0?' ▼':' ▲'):''; };
+    var th='<th class="sticky rankh">#</th>'
+      + '<th class="sticky fwh" data-k="fw" data-tip="'+esc(TIP.fw)+'">Framework'
+      +   '<span class="fwtog'+(state.compactFw?' on':'')+'" id="fwTog" role="button" tabindex="0" aria-pressed="'+(state.compactFw?'true':'false')+'" data-tip="'
+      +   esc(state.compactFw ? TIP.fwExpand : TIP.fwCompact)+'" aria-label="'
+      +   (state.compactFw?'Expand':'Compact')+' the Framework column">'
+      +   (state.compactFw?'\u00ab\u00bb':'\u00bb\u00ab')+'</span>'+ar('fw')+'</th>'
+      + '<th class="sticky scoreh num" data-k="score" data-tip="'+esc(cmpInScope()?TIP.score:TIP.scoreWs)+'">Composite'
+      +   '<a class="hq" href="/docs/scoring/composite-score/" data-tip="'+esc(cmpInScope()?TIP.scoreHelp:TIP.scoreHelpWs)+'"'
+      +      ' aria-label="How the composite score works">?</a>'+ar('score')+'</th>';
+    pids.forEach(function(pid){
+      var p=PROF[pid]; var ref=!scoredForType(pid, leagueType());
+      var nav='<span class="pnav">'
+        + '<a class="pico pgo" data-pid="'+esc(pid)+'" role="button" tabindex="0"'
+        +   ' data-tip="'+esc('Open the '+p.label+' detail view — every entry\u2019s result on this profile, with the columns that profile reports.')+'"'
+        +   ' aria-label="Open the '+esc(p.label)+' detail view">▤</a>'
+        + (p.doc?('<a class="pico" href="/docs/'+esc(p.doc)+'/"'
+        +   ' data-tip="'+esc('Implementation guide for '+p.label+' — what the profile runs, and the rules an entry has to follow.')+'"'
+        +   ' aria-label="'+esc(p.label)+' implementation guide">?</a>'):'')
+        + '</span>';
+      th+='<th class="num pcol'+(ref?' refcol':'')+'" data-k="'+pid+'" data-tip="'+esc(p.category+' · '+p.label+' - '+(p.blurb||'')+(ref?' Not part of the composite score.':''))+'">'+esc(p.label)+ar(pid)+nav+'</th>';
+    });
+    th+='<th class="spacer"></th>';
+    var body=rows.map(function(r){
+      var c=lc(r.lang), rank=rankMap[r.fw], t=typeOf(r.fw), repo=repoOf(r.fw);
+      var nm=esc(r.fw);
+      var pct=r.score/maxScore*100;
+      var fav=favs.has(r.fw);
+      var tr='<tr class="'+(fav?'fav':'')+'" data-fw-row="'+esc(r.fw)+'">'
+        + '<td class="sticky rankc'+(rank<=3?' r'+rank:'')+'">'+rank+'</td>'
+        + '<td class="sticky fwcell"><span class="fl">'
+        +   (state.compactFw
+              // Three things only: the type square (carrying the tuned bar, since
+              // the pill has no room here), and the name. The star, the language
+              // and the medals are what the 156px was going on.
+              ? '<span class="tsq tsq-'+t+(modeOf(r.fw)==='tuned'?' tuned':'')+'" data-tip="'
+                + esc(typeTip(t)+(modeOf(r.fw)==='tuned'?'  ·  '+TUNED_TIP:''))+'"></span>'
+                + '<span class="nm">'+nm+'</span>'
+              : starHtml(r.fw)+'<span class="tndslot">'+tunedPill(r.fw,'tnd')+'</span><span class="tsq tsq-'+t+'" data-tip="'+esc(typeTip(t))+'"></span><span class="lang" style="color:'+(dark?c.textDark:c.text)+'">'+esc(r.lang)+'</span><span class="nm">'+nm+'</span>'+tlsCheckBadge(r.fw)+medalChips(r.fw))
+        +   '</span></td>'
+        + '<td class="sticky scorec" title="'+esc(cmpTip(r))+'"><span class="sc"><b>'+r.score.toFixed(0)+cmpDelta(r)+'</b><span class="bar"><i style="width:'+Math.max(pct,2).toFixed(0)+'%;background:rgba('+c.rgb+','+(dark?0.55:0.42)+')"></i></span></span></td>';
+      pids.forEach(function(pid){
+        var cell=r.cells[pid];
+        if(!cell){ tr+='<td class="num pc empty">·</td>'; return; }
+        var head=(cell.score!=null)?cell.score.toFixed(1):fmtK(cell.rps);
+        var barPct=Math.max(0,Math.min(100,cell.bar));
+        // The value markup is emitted in both modes and only hidden by CSS in
+        // heat mode. The profile columns are width:1px shrink-to-fit, so their
+        // width comes from this content - drop it from the DOM and every column
+        // narrows (measured: -41px each, -573px of table). visibility:hidden
+        // keeps the box, so toggling recolours the table without moving it.
+        var inner = '<span class="pcv"><span class="crps">'+head+'</span><span class="cmem">'+fmtMem(cell.mem)+'</span></span>'
+          + (state.heat
+              ? '<span class="cbar" style="background:'+heatColor(barPct/100)+'"></span>'
+                + (cell.best?'<span class="hcrown" aria-label="best in this column">'+CROWN_SVG+'</span>':'')
+              : '<span class="cbar" style="width:'+barPct.toFixed(0)+'%"></span>');
+        var dat=' data-pid="'+esc(pid)+'" data-fw="'+esc(r.fw)+'"'+(cell.c?'':' data-nc="1"');
+        if(cell.c){ tr+='<td class="num pc'+(cell.best?' lead':'')+'"'+dat+'>'+inner+'</td>'; }
+        else { tr+='<td class="num pc nc"'+dat+'>'+inner+'</td>'; }
+      });
+      return tr+'<td class="spacer"></td></tr>';
+    }).join('');
+    var colspan=pids.length+4;
+    document.getElementById('rows').innerHTML='<div class="cscroll-row endonly" id="cscrollRowTop"><button class="cscroll-end" id="cscrollEndTop" type="button"></button></div><div class="cwrap" id="cwrap"><table class="cm'+(state.compactFw?' compact':'')+(state.heat?' heat':'')+'"><thead><tr>'+th+'</tr></thead><tbody>'+(body||'<tr><td colspan="'+colspan+'" class="empty">No frameworks match this filter.</td></tr>')+'</tbody></table></div><div class="cscroll-row" id="cscrollRow"><div class="cscroll" id="cscrollTop"><div></div></div><button class="cscroll-end" id="cscrollEnd" type="button"></button></div>';
+    // The ? in the Composite header is a link out to the docs, not a sort
+    // target - a click there must not also reorder the table behind the
+    // navigation.
+    Array.prototype.forEach.call(document.querySelectorAll('.cm thead th[data-k]'), function(h){ h.onclick=function(ev){ if(ev.target.closest&&(ev.target.closest('.hq')||ev.target.closest('.fwtog')||ev.target.closest('.pico'))) return; sortBy(h.dataset.k); }; });
+    Array.prototype.forEach.call(document.querySelectorAll('.cm thead th .pico.pgo'), function(a){
+      a.onclick=function(ev){ ev.preventDefault(); ev.stopPropagation(); pickProfile(a.dataset.pid); };
+      a.onkeydown=function(ev){ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); pickProfile(a.dataset.pid); } };
+    });
+    var _ft=document.getElementById('fwTog');
+    if(_ft){ _ft.onclick=function(ev){ ev.stopPropagation(); toggleCompactFw(); };
+             _ft.onkeydown=function(ev){ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); toggleCompactFw(); } }; }
+    setupTopScroll();
+  }
+
+  function val(r,k){ if(k==='rps')return r.rps||0; if(k==='bw')return bw(r.bandwidth); if(k==='bwreq'){var b=bw(r.bandwidth),q=r.rps||0;return q>0?b/q:0;} if(k==='inbw')return bw(r.input_bw); if(k==='avg')return lat(r.avg_latency); if(k==='p99')return lat(r.p99_latency); if(k==='l1mscore')return latScore(state.profile,r.fw); if(k==='p999')return lat(r.p99_9_latency); if(k==='cpureq')return (r.cpu_per_req_us!=null)?+r.cpu_per_req_us:Infinity; if(k==='cputot'){var t=cpuTotPct(r); return t==null?Infinity:t;} if(k==='cpu')return cpu(r.cpu); if(k==='mem')return mem(r.memory); if(k==='fw')return (r.fw||'').toLowerCase(); return 0; }
+  function fmtBytes(n){ if(n>=1048576)return (n/1048576).toFixed(2)+' MB'; if(n>=1024)return (n/1024).toFixed(1)+' KB'; return Math.round(n)+' B'; }
+  // Explorer columns - profile-specific (json-comp adds BW/req, upload adds In BW);
+  // low-priority columns drop out below width breakpoints so the grid never overflows.
+  // The fixed-rate profiles score on cost, not throughput. The rate is pinned, so every
+  // entry that finishes serves the same load and rps cannot separate them; what
+  // can is the bill and the tail. Kept byte-for-byte equivalent to
+  // scripts/latency_1m_score.py, which is the reference implementation and
+  // carries the reasoning for the two different curve shapes.
+  // Offered rate that earns the whole rate factor, per profile. 95% of target:
+  // the generator never quite reaches its own number, so the threshold has to
+  // sit below it. Mirrors FULL_RATE in scripts/latency_score.py.
+  var LAT_FULL={'latency-1m':950000, 'latency-10k':9500, 'latency-500k-8cpu':475000, '8gbit':47500};
+  // Logical CPUs each fixed-rate profile is pinned to, per scripts/lib/profiles.sh:
+  // cpuset 0-31,64-95 is 32 cores with both threads, so 64; latency-500k-8cpu
+  // gets 0-3,64-67, four cores with both threads. Used to turn CPU-per-request
+  // into "how much of the machine it was allowed did this take".
+  var LAT_CPUS={'latency-1m':64, 'latency-10k':64, '8gbit':64, 'latency-500k-8cpu':8};
+  // CPU microseconds per second / 1e6 = cores in use; over the allowance = 0-100%.
+  function cpuTotPct(r,pid){
+    if(r==null||r.cpu_per_req_us==null) return null;
+    var q=r.rps||0; if(!(q>0)) return null;
+    return (+r.cpu_per_req_us)*q/1e6/(LAT_CPUS[pid]||64)*100;
+  }
+  var LAT_W_CPU=0.50, LAT_W_P99=0.25, LAT_W_MEAN=0.25, LAT_DEC=3, LAT_MEAN_DEC=1;
+  var _latScores={};
+  function isLatProfile(pid){ return Object.prototype.hasOwnProperty.call(LAT_FULL,pid); }
+  function clamp01(v){ return v<0?0:v>1?1:v; }
+  // CPU spans ~3.3x across rate-holders, so a plain ratio behaves over it.
+  function latLinear(v,b){ return (!v||!b||v<=0||b<=0)?0:clamp01(b/v); }
+  // The p99 tail spans five orders of magnitude, where a ratio would collapse
+  // to zero for everyone but the leader. A three-decade scale keeps the field
+  // separable and still charges a third of the term for every 10x. The mean is
+  // the queueing signal (in-flight requests over the rate) and spans ~2x among
+  // entries that answer without queueing, so it gets one decade: ten times the
+  // best mean is a request spending nine tenths of its life waiting, worth 0.
+  function latDecade(v,b,d){ d=d||LAT_DEC; return (!v||!b||v<=0||b<=0||!isFinite(v))?0:clamp01(1-Math.log(Math.max(v,b)/b)/Math.LN10/d); }
+  // Build from the canonical result set when the caller has no rows of its own,
+  // so the composite and the detail view agree on the same normalisation.
+  function latEnsure(pid){
+    if(_latScores[pid]) return;
+    var p=PROF[pid], rows=[];
+    if(p) p.conns.forEach(function(c){ rows=rows.concat(D.results[pid+'-'+c]||[]); });
+    latBuild(pid, rows);
+  }
+  function latBuild(pid, rows){
+    var out={}; _latScores[pid]=out;
+    var bc=Infinity,bp=Infinity,bm=Infinity, full=LAT_FULL[pid]||1;
+    rows.forEach(function(r){
+      var c=+r.cpu_per_req_us, p=lat(r.p99_latency), m=lat(r.avg_latency);
+      if(c>0) bc=Math.min(bc,c);
+      if(p>0&&isFinite(p)) bp=Math.min(bp,p);
+      if(m>0&&isFinite(m)) bm=Math.min(bm,m);
+    });
+    rows.forEach(function(r){
+      var rf=clamp01((r.rps||0)/full);
+      out[r.fw]=100*rf*(LAT_W_CPU*latLinear(+r.cpu_per_req_us,bc)
+                       +LAT_W_P99*latDecade(lat(r.p99_latency),bp)
+                       +LAT_W_MEAN*latDecade(lat(r.avg_latency),bm,LAT_MEAN_DEC));
+    });
+  }
+  function latScore(pid,fw){ latEnsure(pid); return (_latScores[pid]||{})[fw]||0; }
+
+  // What a profile's detail view ranks on. Everything here is "most requests
+  // per second wins" except the latency-1m profile, which pins the rate: every
+  // entry delivers the same rps by construction, so ordering on it sorts by
+  // measurement noise. Its metric is the CPU each one spent to do it, and less
+  // of that is better.
+  function defProfileSort(id){ return isLatProfile(id) ? {k:'l1mscore',d:-1} : {k:'rps',d:-1}; }
+  function profileCols(){
+    var W=window.innerWidth;
+    var c=[
+      {k:'rank', w:'54px', min:0},
+      {k:'fw', label:'Framework', w:'minmax(200px,2fr)', min:0, tip:TIP.fw}
+    ];
+    // Latency-1M declares its own set rather than taking the shared one and
+    // appending to it. Adding four columns to the standard seven put the table's
+    // minimum width past a laptop viewport, and the column that gave way was the
+    // framework name, which sits on a minmax floor of 200px and simply truncated.
+    //
+    // Three of the shared columns carry nothing here anyway. Bandwidth is a fixed
+    // function of a rate every entry is held to, so it reads the same for all of
+    // them. CPU % is the sampled figure this profile exists to replace with an
+    // exact one. Avg latency stays: it replaced p99.9 in the score and is the
+    // queueing signal this view has to show. Dropping the other two buys the
+    // name back ~200px and loses no information.
+    if(isLatProfile(state.profile)){
+      c.push({k:'l1mscore', label:'Score', num:true, w:'92px', min:0, tip:'0-100. rateFactor \u00d7 (0.50\u00d7CPU + 0.25\u00d7p99 + 0.25\u00d7mean), each measured against the best in the field. rateFactor is 1 at 95% of the offered rate and falls proportionally below it. Higher is better.'});
+      c.push({k:'rps', label:'Requests / sec', num:true, w:'minmax(150px,1fr)', min:0, tip:TIP.rps});
+      c.push({k:'cpureq', label:'CPU / req', num:true, w:'110px', min:0, tip:'CPU microseconds the server spent per request, read exactly out of its cgroup rather than sampled. This is the profile\u2019s metric - lower is better.'});
+      c.push({k:'cputot', label:'CPU used', num:true, w:'100px', min:520, tip:'The same CPU cost read as a share of the machine this profile allows: CPU-per-request \u00d7 the rate delivered, over the logical CPUs the profile pins (64 for Latency-1M, Latency-10K and 8Gbit, 8 for Latency-500K/8). 100% would mean the entry saturated everything it was given.'});
+      c.push({k:'p99', label:'p99', num:true, w:'92px', min:0, tip:TIP.p99});
+      c.push({k:'avg', label:'Avg', num:true, w:'92px', min:640, tip:'Mean latency, coordinated-omission corrected - the queueing signal, in-flight requests over the rate. Weighted at 0.25 in this profile\u2019s score; ten times the best mean scores zero on that term.'});
+      c.push({k:'mem', label:'Mem', num:true, w:'86px', min:820, tip:TIP.mem});
+      return c.filter(function(x){ return W>=x.min; });
+    }
+    c.push({k:'rps', label:'Requests / sec', num:true, w:'minmax(150px,1fr)', min:0, tip:TIP.rps});
+    c.push({k:'bw', label:'Bandwidth', num:true, w:'112px', min:1024, tip:TIP.bw});
+    if(state.profile==='json-comp') c.push({k:'bwreq', label:'BW / req', num:true, w:'100px', min:640, tip:'Bytes per request - lower means better compression.'});
+    if(state.profile==='upload') c.push({k:'inbw', label:'In BW', num:true, w:'118px', min:640, tip:'Input bandwidth - bytes/sec the server ingests (upload throughput).'});
+    c.push({k:'avg', label:'Avg', num:true, w:'92px', min:820, tip:TIP.avg});
+    c.push({k:'p99', label:'p99', num:true, w:'92px', min:0, tip:TIP.p99});
+    c.push({k:'cpu', label:'CPU %', num:true, w:'96px', min:1024, tip:TIP.cpu});
+    c.push({k:'mem', label:'Mem', num:true, w:'86px', min:820, tip:TIP.mem});
+    return c.filter(function(x){ return W>=x.min; });
+  }
+  function profileCell(k, r, x){
+    if(k==='rank') return '<div class="c rank'+(x.rank<=3?' r'+x.rank:'')+'">'+x.rank+'</div>';
+    if(k==='fw'){ var nm=esc(r.fw); return '<div class="c fw">'+starHtml(r.fw)+'<span class="tndslot">'+tunedPill(r.fw,'tnd')+'</span><span class="tsq tsq-'+x.t+'" data-tip="'+esc(typeTip(x.t))+'"></span><span class="lang" style="color:'+(x.dark?x.lc.textDark:x.lc.text)+'">'+esc(r.lang||'')+'</span><span class="nm">'+nm+'</span>'+tlsCheckBadge(r.fw)+'</div>'; }
+    if(k==='rps'){ var pct=x.maxRps>0?Math.max((r.rps||0)/x.maxRps*100,(r.rps>0?1.5:0)):0; return '<div class="c meter"><span class="mtop"><span class="v'+(r.rps>0?'':' zero')+'">'+fmt(r.rps||0)+'</span>'+statusHtml(r)+'</span><span class="bar"><i style="width:'+pct.toFixed(1)+'%;background:rgba('+x.lc.rgb+','+(x.dark?0.55:0.42)+')"></i></span></div>'; }
+    if(k==='bw') return '<div class="c num sub">'+esc(r.bandwidth||'-')+'</div>';
+    if(k==='bwreq'){ var b=bw(r.bandwidth), q=r.rps||0; return '<div class="c num sub">'+(b>0&&q>0?fmtBytes(b/q):'-')+'</div>'; }
+    if(k==='inbw') return '<div class="c num sub">'+esc(r.input_bw||'-')+'</div>';
+    if(k==='l1mscore'){ var v=latScore(state.profile,r.fw); return '<div class="c num"><b>'+(v?v.toFixed(1):'-')+'</b></div>'; }
+    if(k==='p999') return '<div class="c num sub">'+esc(r.p99_9_latency||'-')+'</div>';
+    if(k==='cpureq') return '<div class="c num sub">'+(r.cpu_per_req_us!=null?esc((+r.cpu_per_req_us).toFixed(2))+' \u00b5s':'-')+'</div>';
+    if(k==='cputot'){ var t=cpuTotPct(r,state.profile); return '<div class="c num sub">'+(t==null?'-':esc(t.toFixed(1))+'%')+'</div>'; }
+    if(k==='avg') return '<div class="c num sub">'+esc(r.avg_latency||'-')+'</div>';
+    if(k==='p99') return '<div class="c num sub">'+esc(r.p99_latency||'-')+'</div>';
+    if(k==='cpu') return '<div class="c num sub">'+esc(r.cpu||'-')+'</div>';
+    if(k==='mem') return '<div class="c num sub">'+esc(r.memory||'-')+'</div>';
+    return '<div class="c"></div>';
+  }
+  function renderProfile(){
+    var all=(D.results[state.profile+'-'+state.conns]||[]).slice();
+    if(isLatProfile(state.profile)) latBuild(state.profile, all);
+    // Rank on whatever this profile is actually about. Ranking the fixed-rate
+    // profile by rps would number entries 1..N by noise around 500,000.
+    var _rk=defProfileSort(state.profile);
+    var byRps=all.slice().sort(function(a,b){var x=val(a,_rk.k),y=val(b,_rk.k); return x===y?0:(x<y?-1:1)*_rk.d;});
+    var rankMap={}; byRps.forEach(function(r,i){rankMap[r.fw]=i+1;});
+    var maxRps=byRps.length?(byRps[0].rps||0):0;
+    renderTypes();
+    var rows=all.filter(function(r){
+      if(state.types.indexOf(typeOf(r.fw))<0) return false;
+      if(!state.showTuned && modeOf(r.fw)==='tuned') return false;
+      if(!matchQ(r.fw, r.lang)) return false;
+      return true;
+    });
+    rows.sort(function(a,b){var x=val(a,state.sortKey),y=val(b,state.sortKey); if(x<y)return -1*state.sortDir; if(x>y)return 1*state.sortDir; return (b.rps||0)-(a.rps||0);});
+    document.getElementById('count').textContent=rows.length+(rows.length===1?' framework':' frameworks');
+    var dark=DARK(), COLS=profileCols();
+    document.getElementById('grid').style.setProperty('--cols', COLS.map(function(c){return c.w;}).join(' '));
+    var thEl=document.getElementById('thead'); thEl.innerHTML='';
+    COLS.forEach(function(col){
+      var d=document.createElement('div'); d.className='th'+(col.num?' num':'')+(state.sortKey===col.k?' sorted':'');
+      if(col.k==='rank'){ d.textContent='#'; thEl.appendChild(d); return; }
+      var ar=state.sortKey===col.k?(state.sortDir<0?'▼':'▲'):'';
+      d.innerHTML=esc(col.label)+' <span class="ar">'+ar+'</span>';
+      if(col.tip) d.setAttribute('data-tip', col.tip);
+      d.onclick=function(){ sortBy(col.k); }; thEl.appendChild(d);
+    });
+    var html=rows.map(function(r){
+      var x={ lc:lc(r.lang), rank:rankMap[r.fw], t:typeOf(r.fw), repo:repoOf(r.fw), dark:dark, maxRps:maxRps };
+      return '<div class="row'+(favs.has(r.fw)?' fav':'')+'" data-fw-row="'+esc(r.fw)+'">'+COLS.map(function(col){return profileCell(col.k, r, x);}).join('')+'</div>';
+    }).join('');
+    document.getElementById('rows').innerHTML=html||'<div class="empty">No frameworks match this filter.</div>';
+  }
+
+  // ── hardware chips ──────────────────────────────────────
+  function shortCpu(s){ return String(s).replace(/\s*\d+-Cores?$/i,'').replace(/\(R\)|\(TM\)/g,'').trim(); }
+  function hw(){
+    var c=D.current||{};
+    var chips=[];
+    if(c.cpu) chips.push('<span class="chip"><b>'+(c.cores||'')+'</b> cores · '+esc(shortCpu(c.cpu))+'</span>');
+    if(c.ram) chips.push('<span class="chip"><b>'+esc(c.ram)+'</b> RAM</span>');
+    if(c.kernel) chips.push('<span class="chip">Linux '+esc(c.kernel)+'</span>');
+    else if(c.os) chips.push('<span class="chip">'+esc(c.os)+'</span>');
+    document.getElementById('hw').innerHTML=chips.join('');
+  }
+
+  // ── theme ───────────────────────────────────────────────
+  function initTheme(){
+    var saved=localStorage.getItem('lb-theme'); if(saved) document.documentElement.setAttribute('data-theme',saved);
+    document.getElementById('theme').onclick=function(){ var next=DARK()?'light':'dark'; document.documentElement.setAttribute('data-theme',next); localStorage.setItem('lb-theme',next); render(); };
+  }
+  document.getElementById('q').addEventListener('input', function(e){ state.q=e.target.value.trim(); render(); });
+
+  // ── boot ────────────────────────────────────────────────
+  document.getElementById('rows').addEventListener('click', function(e){
+    var s=e.target.closest('.star'); if(s){ e.preventDefault(); e.stopPropagation(); toggleFav(s.getAttribute('data-fw')); return; }
+    if(e.target.closest('a')) return;
+    var row=e.target.closest('[data-fw-row]'); if(row) openModal(row.getAttribute('data-fw-row'));
+  });
+  try{ var _vt=['flagship','emerging','experimental','engine','infrastructure']; var _t=JSON.parse(localStorage.getItem('lb-types')||'null'); if(_t&&_t.length){ _t=_t.filter(function(x){return _vt.indexOf(x)>=0;}); if(_t.length) state.types=_t; } }catch(e){}
+  document.getElementById('typeFilter').addEventListener('click', function(e){ var b=e.target.closest('button[data-type]'); if(!b) return; toggleType(b.getAttribute('data-type')); });
+  try{ var _st=localStorage.getItem('lb-showtuned'); if(_st!==null) state.showTuned=_st==='1'; }catch(e){}
+  try{ var _fc=localStorage.getItem('lb-fwcompact'); if(_fc!==null) state.compactFw=_fc==='1'; }catch(e){}
+  document.getElementById('tunedToggle').addEventListener('click', function(){ state.showTuned=!state.showTuned; saveTuned(); render(); });
+  restoreFromHash();
+  initTips(); initHeat(); initModal(); initDocLinks(); initSearchHelp(); initRounds(); initTheme(); initNavSearch(); hw(); buildNav(); renderHead(); render();
+  (function(){ var b=document.getElementById('brandHome'); if(b) b.onclick=function(e){ e.preventDefault(); pickScope('h1'); }; })();
+  window.addEventListener('hashchange', function(){ restoreFromHash(); buildNav(); renderHead(); render(); });
+  var _rz; window.addEventListener('resize', function(){ clearTimeout(_rz); _rz=setTimeout(function(){ if(state.view==='profile') render(); else if(state.view==='composite') syncTopScroll(); }, 150); });
+});
+</script>
+</body>
+</html>

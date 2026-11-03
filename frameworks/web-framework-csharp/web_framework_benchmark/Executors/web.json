@@ -1,0 +1,28 @@
+{
+  "Executors.Baseline11": {
+    "api": "csharp",
+    "loadType": "initialization",
+    "route": "baseline11"
+  },
+  "Executors.JsonExecutor": {
+    "api": "csharp",
+    "loadType": "initialization",
+    "route": "json/{int:count}"
+  },
+  "Executors.Pipeline": {
+    "api": "csharp",
+    "loadType": "initialization",
+    "route": "pipeline"
+  },
+  "Executors.Echo": {
+    "api": "csharp",
+    "loadType": "dynamic",
+    "route": "echo"
+  },
+  "Executors.Ws": {
+    "api": "csharp",
+    "loadType": "initialization",
+    "route": "ws",
+    "webSocketExecutorName": "Executors.WebSocketEcho"
+  }
+}

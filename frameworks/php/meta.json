@@ -1,0 +1,37 @@
+{
+  "display_name": "php-fpm",
+  "language": "PHP",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": false,
+    "middleware": false,
+    "request": true,
+    "response": false
+  },
+  "engine": "nginx",
+  "description": "Plain PHP with PHP-FPM & nginx.",
+  "repo": "https://github.com/php/php-src",
+  "enabled": true,
+  "tests": [
+    "baseline",
+    "async",
+    "latency-1m",
+    "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "static-tls",
+    "async-db",
+    "fortunes",
+    "baseline-h2",
+    "static-h2",
+    "baseline-h3",
+    "static-h3"
+  ],
+  "maintainers": [
+    "joanhey"
+  ]
+}

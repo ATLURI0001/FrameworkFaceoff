@@ -1,0 +1,24 @@
+{
+  "display_name": "araara-standard",
+  "language": "OCaml",
+  "engine": "hcs",
+  "type": "experimental",
+  "mode": "standard",
+  "description": "araara - an OCaml 5 web stack built on HCS, using HCS server defaults where possible for the HttpArena harness. Eio, radix-trie routing, Phoenix-style plugs, Postgres via repodb, gzip/zstd compression. HTTP/3 and gRPC are not implemented.",
+  "repo": "https://araara.ml",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "async-db",
+    "baseline-h2",
+    "static-h2",
+    "baseline-h2c",
+    "json-h2c",
+    "echo-ws"
+  ],
+  "maintainers": ["gdiazlo"]
+}

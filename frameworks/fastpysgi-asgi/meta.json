@@ -1,0 +1,21 @@
+{
+  "display_name": "fastpysgi-asgi",
+  "language": "Python",
+  "type": "engine",
+  "engine": "libuv",
+  "description": "An ultra fast WSGI/ASGI server for Python",
+  "repo": "https://github.com/remittor/fastpysgi",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db"
+  ],
+  "maintainers": [
+    "remittor"
+  ]
+}

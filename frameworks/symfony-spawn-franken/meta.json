@@ -1,0 +1,30 @@
+{
+  "display_name": "symfony-spawn-franken",
+  "language": "PHP",
+  "type": "emerging",
+  "mode": "tuned",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "frankenphp",
+  "description": "Symfony with symfony-spawn bundle: coroutine-per-request isolation via TrueAsync PHP core, Doctrine DBAL connection pooling, and FrankenPHP.",
+  "repo": "https://github.com/yangusik/symfony-spawn",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "async-db",
+    "baseline-h2",
+    "static-h2",
+    "baseline-h3",
+    "static-h3"
+  ],
+  "maintainers": [
+    "YanGusik"
+  ]
+}

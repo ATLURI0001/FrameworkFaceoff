@@ -1,0 +1,15 @@
+{
+  "display_name": "ringzero",
+  "language": "C",
+  "type": "engine",
+  "engine": "io_uring",
+  "description": "Custom C HTTP server built on io_uring with a multi-reactor architecture. No epoll, no thread-per-connection.",
+  "repo": "https://github.com/MDA2AV/ringzero",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn"
+  ],
+  "maintainers": []
+}

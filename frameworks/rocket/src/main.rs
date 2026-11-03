@@ -1,0 +1,194 @@
+#[macro_use]
+extern crate rocket;
+
+use std::collections::HashMap;
+
+use rocket::data::{Data, ToByteUnit};
+use rocket::serde::json::Json;
+use rocket_async_compression::{Compress, Level};
+use rocket::serde::{Deserialize, Serialize};
+use rocket::State;
+
+const MAX_BODY_MIB: usize = 25;
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct Rating {
+    score: i64,
+    count: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct DatasetItem {
+    id: i64,
+    name: String,
+    category: String,
+    price: i64,
+    quantity: i64,
+    active: bool,
+    tags: Vec<String>,
+    rating: Rating,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ProcessedRating {
+    score: i64,
+    count: i64,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ProcessedItem {
+    id: i64,
+    name: &'static str,
+    category: &'static str,
+    price: i64,
+    quantity: i64,
+    active: bool,
+    tags: &'static [String],
+    rating: ProcessedRating,
+    total: i64,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ProcessResponse {
+    items: Vec<ProcessedItem>,
+    count: usize,
+}
+
+fn load_dataset() -> Vec<DatasetItem> {
+    let path = std::env::var("DATASET_PATH").unwrap_or_else(|_| "/data/dataset.json".to_string());
+    match std::fs::read_to_string(path) {
+        Ok(data) => rocket::serde::json::from_str(&data).unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
+}
+
+fn sum_params(params: &HashMap<String, String>) -> i64 {
+    params.values().filter_map(|v| v.parse::<i64>().ok()).sum()
+}
+
+#[get("/pipeline")]
+fn pipeline() -> &'static str {
+    "ok"
+}
+
+// tokio's sleep parks the task rather than the thread, so the waits in flight are bounded
+// by memory rather than by the runtime's worker count.
+#[get("/delay/<ms>")]
+async fn delay(ms: u64) -> String {
+    if ms > 0 {
+        rocket::tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+    }
+    ms.to_string()
+}
+
+#[get("/baseline11?<params..>")]
+fn baseline11_get(params: HashMap<String, String>) -> String {
+    sum_params(&params).to_string()
+}
+
+#[post("/baseline11?<params..>", data = "<body>")]
+fn baseline11_post(params: HashMap<String, String>, body: String) -> String {
+    let mut sum = sum_params(&params);
+    if let Ok(n) = body.trim().parse::<i64>() {
+        sum += n;
+    }
+    sum.to_string()
+}
+
+// Compression is applied by wrapping this route's responder rather than by
+// attaching the crate's fairing. A fairing runs on every response, and measured
+// here it cost about 5% of baseline throughput to do nothing at all - only
+// json-comp sends an Accept-Encoding, so everywhere else the hook ran, found
+// nothing to do, and returned. Compress is the same crate's Responder, so the
+// encoding still happens in Rocket's response pipeline rather than by hand.
+//
+// Level::Precise(1) is the level the profile asks for. The crate's Level::Default
+// is 4, and its Fastest is not pinned to 1 either, so the level is stated.
+#[get("/json/<count>?<m>")]
+fn json_items(
+    count: usize,
+    m: Option<i64>,
+    dataset: &State<&'static [DatasetItem]>,
+) -> Compress<Json<ProcessResponse>> {
+    let count = count.min(dataset.len());
+    let m = m.unwrap_or(1);
+
+    let items = dataset[..count]
+        .iter()
+        .map(|item| ProcessedItem {
+            id: item.id,
+            name: &item.name,
+            category: &item.category,
+            price: item.price,
+            quantity: item.quantity,
+            active: item.active,
+            tags: &item.tags,
+            rating: ProcessedRating {
+                score: item.rating.score,
+                count: item.rating.count,
+            },
+            total: item.price * item.quantity * m,
+        })
+        .collect();
+
+    Compress(Json(ProcessResponse { items, count }), Level::Precise(1))
+}
+
+// Echo: read the body and hand it straight back. into_bytes() reads to the
+// cap regardless of framing, so a chunked request works without a
+// Content-Length to size it from.
+#[post("/echo", data = "<data>")]
+async fn echo_body(data: Data<'_>) -> Vec<u8> {
+    match data.open(MAX_BODY_MIB.mebibytes()).into_bytes().await {
+        Ok(buf) => buf.into_inner(),
+        Err(_) => Vec::new(),
+    }
+}
+
+// Single definition of the app; both the plaintext and the TLS listener are
+// configured from it, so the two ports cannot drift apart.
+fn build(dataset: &'static [DatasetItem]) -> rocket::Rocket<rocket::Build> {
+    rocket::build()
+        .manage(dataset)
+        .mount(
+            "/",
+            routes![pipeline, delay, baseline11_get, baseline11_post, json_items, echo_body],
+        )
+}
+
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
+    // Leaked once at startup so handlers borrow the items instead of cloning
+    // every string into the response.
+    let dataset: &'static [DatasetItem] = Box::leak(load_dataset().into_boxed_slice());
+
+    // Rocket binds one address per instance, so json-tls needs a second one.
+    // Both start from Config::figment(), which keeps the ROCKET_* env from the
+    // Dockerfile (address, log level) applying to each.
+    let plain = build(dataset).configure(rocket::Config::figment().merge(("port", 8080)));
+
+    // Rocket's own TLS, driven off the mounted PEMs. The harness only mounts
+    // /certs for the TLS profiles, so without them only 8080 comes up.
+    let cert = std::path::Path::new("/certs/server.crt");
+    let key = std::path::Path::new("/certs/server.key");
+    if cert.exists() && key.exists() {
+        let tls = build(dataset).configure(
+            rocket::Config::figment()
+                .merge(("port", 8081))
+                .merge(("tls.certs", cert))
+                .merge(("tls.key", key)),
+        );
+        let (plain_res, tls_res) = rocket::tokio::join!(plain.launch(), tls.launch());
+        plain_res?;
+        tls_res?;
+    } else {
+        plain.launch().await?;
+    }
+
+    Ok(())
+}

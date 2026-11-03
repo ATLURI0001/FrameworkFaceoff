@@ -1,0 +1,26 @@
+{
+  "display_name": "lute",
+  "language": "Luau",
+  "type": "emerging",
+  "mode": "standard",
+  "completeness": {
+    "routing": false,
+    "middleware": false,
+    "request": true,
+    "response": true
+  },
+  "engine": "lute",
+  "description": "Lute standalone Luau runtime",
+  "repo": "https://github.com/luau-lang/lute",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-tls",
+    "8gbit",
+    "echo-ws",
+    "echo-ws-pipeline"
+  ],
+  "maintainers": ["nicell"]
+}

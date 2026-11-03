@@ -1,0 +1,30 @@
+{
+  "display_name": "sark",
+  "language": "Rust",
+  "type": "engine",
+  "engine": "io_uring",
+  "description": "sark — Rust HTTP on the dope io_uring runtime: thread-per-core, zero-copy parsing, type-safe routing, cartel-pg for Postgres. No serde, no tokio, no Arc/atomic.",
+  "repo": "https://github.com/dope-rs/dope",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "8gbit",
+    "async-db",
+    "fortunes",
+    "json-tls",
+    "baseline-h2c",
+    "json-h2c",
+    "baseline-h2",
+    "static-h2",
+    "echo-ws",
+    "echo-ws-pipeline",
+    "unary-grpc",
+    "unary-grpc-tls"
+  ],
+  "maintainers": [
+    "inq"
+  ]
+}

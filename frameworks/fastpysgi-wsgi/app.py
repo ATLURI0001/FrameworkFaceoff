@@ -1,0 +1,463 @@
+import os
+import sys
+import json
+import multiprocessing
+import zlib
+import sqlite3
+import mimetypes
+from urllib.parse import parse_qs
+
+import orjson
+import psycopg_pool
+import psycopg.rows
+
+# -- Dataset and constants --------------------------------------------------------
+
+CPU_COUNT = int(multiprocessing.cpu_count())
+WRK_COUNT = min(len(os.sched_getaffinity(0)), 128)
+WRK_COUNT = max(WRK_COUNT, 4)
+
+DATASET_LARGE_PATH = "/data/dataset-large.json"
+DATASET_PATH = os.environ.get("DATASET_PATH", "/data/dataset.json")
+DATASET_ITEMS = None
+try:
+    with open(DATASET_PATH) as file:
+        DATASET_ITEMS = json.load(file)
+except Exception:
+    pass
+
+STATIC_DIR = '/data/static/'
+STATIC_FILES = { }
+
+def load_static_files():
+    global STATIC_FILES, STATIC_DIR
+    mimetypes.add_type('.woff2' , 'font/woff2')
+    mimetypes.add_type('.webp'  , 'image/webp')
+    for root, dirs, files in os.walk(STATIC_DIR):
+        for filename in files:
+            full_path = os.path.join(root, filename)
+            key = full_path.replace(os.sep, '/')
+            try:
+                with open(full_path, 'rb') as file:
+                    data = file.read()
+            except Exception as e:
+                continue
+            ext = os.path.splitext(filename)[1]
+            content_type, encoding = mimetypes.guess_type(key)
+            if content_type is None:
+                content_type = 'application/octet-stream'
+                encoding = None
+            STATIC_FILES[key] = { "data": data, "type": content_type, "enc": encoding, "ENC": { } }
+            pass
+    for key, row in STATIC_FILES.items():
+        if row['enc'] is None:
+            if key+'.gz' in STATIC_FILES and STATIC_FILES[key+'.gz']['enc'] == 'gzip':
+                STATIC_FILES[key]['ENC']['gzip'] = key+'.gz'
+            if key+'.br' in STATIC_FILES and STATIC_FILES[key+'.br']['enc'] == 'br':
+                STATIC_FILES[key]['ENC']['br'] = key+'.br'
+
+load_static_files()
+
+# -- Postgres DB ------------------------------------------------------------
+
+DATABASE_URL = os.environ.get("DATABASE_URL", '')
+DATABASE_POOL = None
+DATABASE_QUERY = (
+    "SELECT id, name, category, price, quantity, active, tags, rating_score, rating_count"
+    "  FROM items"
+    " WHERE price BETWEEN %s AND %s LIMIT %s"
+)
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+
+PG_POOL_MIN_SIZE = 1
+PG_POOL_MAX_SIZE = 2
+
+def db_close():
+    global DATABASE_POOL
+    if DATABASE_POOL:
+        try:
+            DATABASE_POOL.close()
+        except Exception:
+            pass
+    DATABASE_POOL = None
+
+def db_setup():
+    global DATABASE_POOL, DATABASE_URL, WRK_COUNT
+    db_close()
+    if not DATABASE_URL:
+        return
+    DATABASE_MAX_CONN = os.environ.get("DATABASE_MAX_CONN", None)
+    if DATABASE_MAX_CONN:
+        avr_pool_size = int(DATABASE_MAX_CONN) * 0.92 / WRK_COUNT
+        #PG_POOL_MIN_SIZE = int(avr_pool_size + 0.35)
+        PG_POOL_MAX_SIZE = int(avr_pool_size + 0.95)
+    try:
+        DATABASE_POOL = psycopg_pool.ConnectionPool(
+            conninfo = DATABASE_URL,
+            min_size = max(PG_POOL_MIN_SIZE, 1),
+            max_size = max(PG_POOL_MAX_SIZE, 2),
+            kwargs = { 'row_factory': psycopg.rows.dict_row },
+        )
+        #DATABASE_POOL.wait()
+    except Exception:
+        DATABASE_POOL = None
+
+# -- Helpers ----------------------------------------------------------
+
+def get_path_tail(env):
+    path = env["PATH_INFO"]
+    xpos = path.rfind('/')
+    return path[xpos+1:] if xpos > 0 else ""
+
+def check_accept_encoding(env, substr):
+    aenc = env.get('HTTP_ACCEPT_ENCODING', '')
+    if aenc and substr == "":
+        return True
+    if aenc and substr in aenc:
+        return True
+    return False
+
+def make_resp(status: int, headers: list, body: str | bytes, contenc: str | None = None):
+    if isinstance(body, str):
+        body = body.encode('utf-8')
+    if contenc and contenc != 'BR':
+        if contenc == 'GZIP':
+            body = zlib.compress(body, level = 1, wbits = 31)
+        headers.append( ('Content-Encoding', contenc.lower()) )
+    return status, headers, body
+
+def text_resp(body: str | bytes, status: int = 200, contenc: str | None = None):
+    return make_resp(status, [ ( 'Content-Type', 'text/plain; charset=utf-8' ) ], body, contenc)
+
+def json_resp(body: dict, status: int = 200, contenc: str | None = None):
+    if isinstance(body, dict):
+        body = orjson.dumps(body)
+    return make_resp(status, [ ('Content-Type', 'application/json') ], body, contenc)
+
+# -- Routes -----------------------------------------------------------
+
+def pipeline(env):
+    return 200, [ ( 'Content-Type', 'text/plain; charset=utf-8' ) ], b'ok'
+
+def baseline11(env):
+    req_method = env.get('REQUEST_METHOD', '')
+    query_params = parse_qs(env.get('QUERY_STRING', ''))
+    total = 0
+    for val in query_params.values():
+        total += int(val[0])
+    if req_method == "POST":
+        total += int(env['wsgi.input'].read(100))
+    return text_resp(str(total))
+
+def json_endpoint(env):
+    global DATASET_ITEMS
+    if not DATASET_ITEMS:
+        return text_resp("No dataset", 500)
+    contenc = 'GZIP' if check_accept_encoding(env, 'gzip') else ''
+    try:
+        count = int(get_path_tail(env))
+        query_params = parse_qs(env.get('QUERY_STRING', ''))
+        m_val = float(query_params.get("m")[0])
+        items = [ ]
+        for idx, dsitem in enumerate(DATASET_ITEMS):
+            if idx >= count:
+                break
+            item = dict(dsitem)
+            item["total"] = dsitem["price"] * dsitem["quantity"] * m_val
+            items.append(item)
+        return json_resp( { "items": items, "count": len(items) }, contenc = contenc)
+    except Exception:
+        return json_resp( { "items": [ ], "count": 0 }, contenc = contenc)
+
+def async_db_endpoint(env):
+    global DATABASE_POOL, DATABASE_QUERY
+    if not DATABASE_POOL:
+        db_setup()
+    if not DATABASE_POOL:
+        return json_resp( { "items": [ ], "count": 0 } )
+    try:
+        query_params = parse_qs(env.get('QUERY_STRING', ''))
+        min_val = float(query_params.get("min")[0])
+        max_val = float(query_params.get("max")[0])
+        lim_val = int(query_params.get("limit")[0])
+        with DATABASE_POOL.connection() as conn:
+            rows = conn.execute(DATABASE_QUERY, (min_val, max_val, lim_val)).fetchall()
+        items = [
+            {
+                'id'      : row['id'],
+                'name'    : row['name'],
+                'category': row['category'],
+                'price'   : row['price'],
+                'quantity': row['quantity'],
+                'active'  : row['active'],
+                'tags'    : json.loads(row['tags']) if isinstance(row['tags'], str) else row['tags'],
+                'rating': {
+                    'score': row['rating_score'],
+                    'count': row['rating_count'],
+                }
+            }
+            for row in rows
+        ]
+        return json_resp( { "items": items, "count": len(items) } )
+    except Exception:
+        return json_resp( { "items": [ ], "count": 0 } )
+
+def static_file_endpoint(env):
+    global STATIC_FILES, STATIC_DIR
+    path = env["PATH_INFO"]
+    filename = STATIC_DIR + path.removeprefix('/static/')
+    entry = STATIC_FILES.get(filename)
+    if entry is None:
+        return text_resp(b'Not found', status = 404)
+    if check_accept_encoding(env, 'br') and 'br' in entry['ENC']:
+        entry = STATIC_FILES[entry['ENC']['br']]
+    elif check_accept_encoding(env, 'gzip') and 'gzip' in entry['ENC']:
+        entry = STATIC_FILES[entry['ENC']['gzip']]
+    return make_resp(200, [ ('Content-Type', entry['type']) ], entry['data'], contenc = entry['enc'])
+
+
+def echo_endpoint(env):
+    body = env["wsgi.input"].getbuffer().tobytes()
+    return make_resp(200, [ ( 'Content-Type', 'application/octet-stream' ) ], body)
+
+
+
+# -- crud --------------------------------------------------------------------
+# The dispatcher keys on the path up to the last slash, so /crud/items lands on
+# "/crud/" and /crud/items/<id> on "/crud/items/".
+
+REDIS = None
+
+CRUD_COLUMNS = (
+    "id, name, category, price, quantity, active, tags, rating_score, rating_count"
+)
+
+# The crud profile reads and writes the same ids, so a long TTL would answer from
+# a copy the writes have already moved past.
+CRUD_TTL_MS = 200
+
+
+def redis_setup():
+    global REDIS
+    if REDIS is not None:
+        return REDIS
+    url = os.environ.get("REDIS_URL")
+    if not url:
+        return None
+    try:
+        import redis
+        REDIS = redis.Redis.from_url(url, decode_responses=True)
+    except Exception:
+        REDIS = None
+    return REDIS
+
+
+def crud_item(row):
+    tags = row["tags"]
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "category": row["category"],
+        "price": row["price"],
+        "quantity": row["quantity"],
+        "active": row["active"],
+        # tags is a JSONB column, so it arrives as text unless a codec is set
+        "tags": json.loads(tags) if isinstance(tags, str) else tags,
+        "rating": {"score": row["rating_score"], "count": row["rating_count"]},
+    }
+
+
+def qs_int(query_params, name, fallback):
+    try:
+        return int(query_params.get(name)[0])
+    except Exception:
+        return fallback
+
+
+def crud_collection_endpoint(env):
+    global DATABASE_POOL
+    if not DATABASE_POOL:
+        db_setup()
+    if not DATABASE_POOL:
+        return json_resp({"error": "DB not available"}, status=500)
+    if env.get("REQUEST_METHOD", "") == "POST":
+        try:
+            body = json.loads(env["wsgi.input"].read())
+        except Exception:
+            return json_resp({"error": "insert failed"}, status=500)
+        try:
+            with DATABASE_POOL.connection() as conn:
+                row = conn.execute(
+                    "INSERT INTO items (id, name, category, price, quantity, active, "
+                    "tags, rating_score, rating_count) "
+                    "VALUES (%s, %s, %s, %s, %s, true, '[\"bench\"]', 0, 0) "
+                    "ON CONFLICT (id) DO UPDATE SET name = %s, price = %s, "
+                    "quantity = %s RETURNING id",
+                    (body.get("id"), body.get("name", "New Product"),
+                     body.get("category", "test"), body.get("price", 0),
+                     body.get("quantity", 0), body.get("name", "New Product"),
+                     body.get("price", 0), body.get("quantity", 0)),
+                ).fetchone()
+        except Exception:
+            return json_resp({"error": "insert failed"}, status=500)
+        return json_resp(
+            {
+                "id": row["id"], "name": body.get("name"),
+                "category": body.get("category"), "price": body.get("price"),
+                "quantity": body.get("quantity"),
+            },
+            status=201,
+        )
+    query_params = parse_qs(env.get("QUERY_STRING", ""))
+    category = (query_params.get("category") or ["electronics"])[0]
+    page = max(1, qs_int(query_params, "page", 1))
+    limit = max(1, min(50, qs_int(query_params, "limit", 10)))
+    try:
+        with DATABASE_POOL.connection() as conn:
+            rows = conn.execute(
+                f"SELECT {CRUD_COLUMNS} FROM items WHERE category = %s ORDER BY id "
+                "LIMIT %s OFFSET %s",
+                (category, limit, (page - 1) * limit),
+            ).fetchall()
+    except Exception:
+        return json_resp({"error": "query failed"}, status=500)
+    items = [crud_item(r) for r in rows]
+    return json_resp(
+        {"items": items, "total": len(items), "page": page, "limit": limit}
+    )
+
+
+# Cache-aside on Redis where the harness provides it - crud is the one profile
+# that does, and the cache is shared across the workers as a per-worker dict
+# would not be.
+def crud_item_endpoint(env):
+    global DATABASE_POOL
+    if not DATABASE_POOL:
+        db_setup()
+    if not DATABASE_POOL:
+        return json_resp({"error": "DB not available"}, status=500)
+    path = env["PATH_INFO"]
+    try:
+        item_id = int(path[path.rfind("/") + 1:])
+    except Exception:
+        return text_resp(b"", status=404)
+    key = "crud:%d" % item_id
+    rds = redis_setup()
+    if env.get("REQUEST_METHOD", "") == "PUT":
+        try:
+            body = json.loads(env["wsgi.input"].read())
+        except Exception:
+            return json_resp({"error": "update failed"}, status=500)
+        try:
+            with DATABASE_POOL.connection() as conn:
+                cur = conn.execute(
+                    "UPDATE items SET name = %s, price = %s, quantity = %s "
+                    "WHERE id = %s",
+                    (body.get("name", "Updated"), body.get("price", 0),
+                     body.get("quantity", 0), item_id),
+                )
+                affected = cur.rowcount
+        except Exception:
+            return json_resp({"error": "update failed"}, status=500)
+        if not affected:
+            return text_resp(b"", status=404)
+        if rds is not None:
+            try:
+                rds.delete(key)
+            except Exception:
+                pass
+        return json_resp(
+            {
+                "id": item_id, "name": body.get("name"),
+                "price": body.get("price"), "quantity": body.get("quantity"),
+            }
+        )
+    if rds is not None:
+        try:
+            hit = rds.get(key)
+        except Exception:
+            hit = None
+        if hit:
+            return 200, [
+                ("Content-Type", "application/json"),
+                ("X-Cache", "HIT"),
+            ], hit.encode()
+    try:
+        with DATABASE_POOL.connection() as conn:
+            row = conn.execute(
+                f"SELECT {CRUD_COLUMNS} FROM items WHERE id = %s LIMIT 1", (item_id,)
+            ).fetchone()
+    except Exception:
+        return json_resp({"error": "query failed"}, status=500)
+    if row is None:
+        return text_resp(b"", status=404)
+    body = json.dumps(crud_item(row)).encode()
+    if rds is not None:
+        try:
+            rds.set(key, body, px=CRUD_TTL_MS)
+        except Exception:
+            pass
+    return 200, [
+        ("Content-Type", "application/json"),
+        ("X-Cache", "MISS"),
+    ], body
+
+
+ROUTES = {
+    '/pipeline': pipeline,
+    '/baseline11': baseline11,
+    '/json/': json_endpoint,
+    '/json-comp/': json_endpoint,
+    '/echo': echo_endpoint,
+    '/static/': static_file_endpoint,
+    '/async-db': async_db_endpoint,
+    '/crud/': crud_collection_endpoint,
+    '/crud/items/': crud_item_endpoint,
+}
+
+def handle_404(env):
+    return text_resp(b'Not found', status = 404)
+
+def handle_405(env):
+    return text_resp(b'Method Not Allowed', status = 405)
+
+# -- WSGI app -----------------------------------------------------------
+
+HTTP_STATUS = {
+    200: '200 OK',
+    404: '404 Not Found',
+    405: '405 Method Not Allowed',
+    500: '500 Internal Server Error',
+}
+
+def app(env, start_response):
+    global ROUTES, HTTP_STATUS
+    req_method = env.get('REQUEST_METHOD', '')
+    if req_method not in [ 'GET', 'POST', 'PUT' ]:
+        status, headers, body = handle_405(env)
+    else:
+        path = env["PATH_INFO"]
+        xpos = path.rfind('/')
+        xpath = path if xpos <= 0 else path[0:xpos+1]
+        app_handler = ROUTES.get(xpath, handle_404)
+        status, headers, body = app_handler(env)
+    start_response(HTTP_STATUS.get(status, str(status)), headers)
+    return [ body ]
+
+# -----------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import fastpysgi
+
+    certfile = os.environ.get("TLS_CERT", "/certs/server.crt")
+    keyfile  = os.environ.get("TLS_KEY" , "/certs/server.key")
+
+    fastpysgi.server.delete_all_binds()
+    fastpysgi.server.add_bind('0.0.0.0', 8080)
+    fastpysgi.server.add_bind('0.0.0.0', 8081, (certfile, keyfile, None))
+
+    fastpysgi.server.read_buffer_size = 256*1024
+    fastpysgi.server.max_content_length = 31_000_000
+    fastpysgi.server.backlog = 16*1024
+    fastpysgi.run(app, workers = WRK_COUNT, loglevel = 0)

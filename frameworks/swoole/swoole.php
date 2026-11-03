@@ -1,0 +1,216 @@
+<?php
+
+use Swoole\Http\Server;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+
+require __DIR__ . '/PostgreSQL.php';
+require __DIR__ . '/Crud.php';
+
+$dataset = json_decode(file_get_contents('/data/dataset.json'), true);
+
+const MIME_TYPES = [
+    'css'   => "text/css",
+    'js'    => "application/javascript",
+    'html'  => "text/html",
+    'woff2' => "font/woff2",
+    'svg'   => "image/svg+xml",
+    'webp'  => "image/webp",
+    'json'  => "application/json"
+];
+
+// Static files: only paths and MIME types are resolved at startup. File bodies are
+// read from disk on every request - the static profiles measure that I/O.
+$files = [];
+$dir   = new DirectoryIterator('/data/static');
+foreach ($dir as $fileInfo) {
+    if ($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    if (str_ends_with($name, '.br') || str_ends_with($name, '.gz')) continue;
+    $base = $fileInfo->getPathname();
+    $files['/static/' . $name] = [
+        'path' => $base,
+        'mime' => MIME_TYPES[pathinfo($name, PATHINFO_EXTENSION)] ?? 'application/octet-stream',
+        'br'   => file_exists($base . '.br') ? $base . '.br' : null,
+        'gz'   => file_exists($base . '.gz') ? $base . '.gz' : null,
+    ];
+}
+
+$serveStatic = function (Request $request, Response $response, array $f): void {
+    $response->header['Content-Type'] = $f['mime'];
+    $ae = $request->header['accept-encoding'] ?? '';
+    if ($f['br'] !== null && str_contains($ae, 'br')) {
+        $response->header['Content-Encoding'] = 'br';
+        $response->end(file_get_contents($f['br']));
+    } elseif ($f['gz'] !== null && str_contains($ae, 'gzip')) {
+        $response->header['Content-Encoding'] = 'gzip';
+        $response->end(file_get_contents($f['gz']));
+    } else {
+        $response->end(file_get_contents($f['path']));
+    }
+};
+
+// Allocate the shared crud cache before the workers fork, so they all map it.
+Crud::initCache();
+
+$http = new Server('0.0.0.0', 8080);
+$http->set([
+    'worker_num'         => swoole_cpu_num(),
+    'enable_reuse_port'  => true,
+    'enable_coroutine'   => false,
+    'package_max_length' => 30 * 1024 * 1024
+]);
+
+$http->on('workerStart', function (Server $server, int $workerId) {
+    PostgreSQL::init();
+});
+
+$http->on('request', function (Request $request, Response $response) use ($dataset, $files, $serveStatic) {
+    $path = $request->server['request_uri'];
+
+    if (str_starts_with($path, '/delay/')) {
+        $ms = (int) substr($path, 7);
+        // usleep, not Co::sleep: this server runs with enable_coroutine => false, so there is no
+        // coroutine to suspend and Co::sleep takes the worker down with it. The wait therefore
+        // holds a worker, which is what the profile is measuring for a stack configured this way -
+        // turning coroutines on to score better here would change every other profile too.
+        if ($ms > 0) {
+            usleep($ms * 1000);
+        }
+        $response->header['Content-Type'] = 'text/plain';
+        $response->end((string) $ms);
+        return;
+    }
+
+    if ($path === '/pipeline') {
+        $response->header['Content-Type'] = 'text/plain';
+        $response->end('ok');
+        return;
+    }
+
+    if ($path === '/baseline2' || $path === '/baseline11') {
+        $sum = array_sum($request->get ?? []);
+        if ($request->server['request_method'] === 'POST') {
+            $sum += (int)$request->getContent();
+        }
+        $response->header['Content-Type'] = 'text/plain';
+        $response->end((string)$sum);
+        return;
+    }
+
+    if (preg_match('#^/json/(\d+)$#', $path, $matches)) {
+        $count = min((int)$matches[1], count($dataset));
+        $m     = (int)($request->get['m'] ?? 1);
+        if ($m === 0) $m = 1;
+        $items = [];
+        for ($i = 0; $i < $count; $i++) {
+            $item          = $dataset[$i];
+            $item['total'] = $item['price'] * $item['quantity'] * $m;
+            $items[]       = $item;
+        }
+        $response->header['Content-Type'] = 'application/json';
+        $response->end(json_encode(['items' => $items, 'count' => $count], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return;
+    }
+
+    if ($path === '/echo') {
+        $response->header['Content-Type'] = 'application/octet-stream';
+        $response->end($request->getContent());
+        return;
+    }
+
+    if ($path === '/async-db') {
+        $response->header['Content-Type'] = 'application/json';
+        $min   = (int)($request->get['min'] ?? 10);
+        $max   = (int)($request->get['max'] ?? 50);
+        $limit = max(1, min(50, (int)($request->get['limit'] ?? 50)));
+        $response->end(PostgreSQL::query($min, $max, $limit));
+        return;
+    }
+
+    if (str_starts_with($path, '/static/')) {
+        if (isset($files[$path])) {
+            $serveStatic($request, $response, $files[$path]);
+            return;
+        }
+    }
+
+    if ($path === '/crud/items') {
+        if ($request->server['request_method'] === 'POST') {
+            Crud::create($request, $response);
+        } else {
+            Crud::list($request, $response);
+        }
+        return;
+    }
+
+    if (str_starts_with($path, '/crud/items/')) {
+        $id = (int)substr($path, strlen('/crud/items/'));
+        if ($request->server['request_method'] === 'PUT') {
+            Crud::update($request, $response, $id);
+        } else {
+            Crud::read($request, $response, $id);
+        }
+        return;
+    }
+
+    $response->status(404);
+    $response->header['Content-Type'] = 'text/plain';
+    $response->end('404 Not Found');
+});
+
+$port = $http->listen('0.0.0.0', 8443, SWOOLE_TCP | SWOOLE_SSL);
+$port->set([
+    'open_http2_protocol' => true,
+    'ssl_cert_file'       => '/certs/server.crt',
+    'ssl_key_file'        => '/certs/server.key',
+    'package_max_length'  => 30 * 1024 * 1024
+]);
+
+$port2 = $http->listen('0.0.0.0', 8081, SWOOLE_TCP | SWOOLE_SSL);
+$port2->set([
+    'ssl_cert_file'      => '/certs/server.crt',
+    'ssl_key_file'       => '/certs/server.key',
+    'package_max_length' => 30 * 1024 * 1024,
+    'http_compression'   => false,
+    'open_http_protocol' => true,
+]);
+$port2->on('request', function (Request $request, Response $response) use ($dataset, $files, $serveStatic) {
+    $path = $request->server['request_uri'];
+
+    if (str_starts_with($path, '/static/')) {
+        if (isset($files[$path])) {
+            $serveStatic($request, $response, $files[$path]);
+            return;
+        }
+    }
+
+    if (preg_match('#^/json/(\d+)$#', $path, $matches)) {
+        $count = min((int)$matches[1], count($dataset));
+        $m     = (int)($request->get['m'] ?? 1);
+        if ($m === 0) $m = 1;
+        $items = [];
+        for ($i = 0; $i < $count; $i++) {
+            $item          = $dataset[$i];
+            $item['total'] = $item['price'] * $item['quantity'] * $m;
+            $items[]       = $item;
+        }
+        $response->header['Content-Type'] = 'application/json';
+        $response->end(json_encode(['items' => $items, 'count' => $count], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return;
+    }
+
+    // 8gbit drives :8081, which has its own callback -- the /echo branch in
+    // the plaintext handler above is not reachable from here.
+    if ($path === '/echo') {
+        $response->header['Content-Type'] = 'application/octet-stream';
+        $response->end($request->getContent());
+        return;
+    }
+
+    $response->status(404);
+    $response->header['Content-Type'] = 'text/plain';
+    $response->end('404 Not Found');
+});
+
+$http->start();

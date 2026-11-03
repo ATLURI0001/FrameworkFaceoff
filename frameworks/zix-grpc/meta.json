@@ -1,0 +1,16 @@
+{
+  "display_name": "zix",
+  "language": "Zig",
+  "type": "engine",
+  "engine": "zix.Grpc URING Dispatch Model",
+  "description": "Zig gRPC server on the zix.Grpc engine (native h2 framing), .URING dispatch: shared-nothing per-core io_uring with SO_REUSEPORT, unary plus server-streaming with DATA-frame coalescing. Dual listener (config.tls_port): h2c 8080 plus gRPC over TLS 1.3 on 8443, one process.",
+  "repo": "https://github.com/prothegee/zix",
+  "enabled": true,
+  "tests": [
+    "unary-grpc",
+    "unary-grpc-tls"
+  ],
+  "maintainers": [
+    "prothegee"
+  ]
+}

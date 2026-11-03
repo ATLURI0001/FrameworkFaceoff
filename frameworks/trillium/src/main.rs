@@ -1,0 +1,108 @@
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+mod grpc;
+mod handlers;
+mod state;
+
+use env_logger::Env;
+use grpc::{Benchmark, BenchmarkServiceServer};
+use handlers::{
+    api_item_read, api_item_write, api_me, async_db, baseline_any, baseline_get, crud_create,
+    crud_list, crud_read, crud_update, delay, echo_body, fortunes, json_handler, pipeline, ws_echo,
+};
+use state::AppState;
+use std::{env, error::Error, fs};
+use trillium::{Conn, Handler, HttpConfig, KnownHeaderName, Method};
+use trillium_cache::{Cache, InMemoryStorage};
+use trillium_compression::Compression;
+use trillium_quinn::QuicConfig;
+use trillium_router::Router;
+use trillium_rustls::RustlsAcceptor;
+use trillium_static::StaticFileHandler;
+use trillium_tokio::config;
+use trillium_websockets::websocket;
+
+fn build_handler() -> impl Handler {
+    let static_dir = env::var("STATIC_DIR").unwrap_or_else(|_| "/data/static".into());
+    (
+        BenchmarkServiceServer::new(Benchmark),
+        Compression::new(),
+        Router::new()
+            .get("/pipeline", pipeline)
+            .any(&[Method::Get, Method::Post], "/baseline11", baseline_any)
+            .get("/baseline2", baseline_get)
+            .get("/json/:count", json_handler)
+            .post("/echo", echo_body)
+            .get("/delay/:ms", delay)
+            .get(
+                "/static/*",
+                (
+                    // rfc 9111 cache over the filesystem handler. max-age=1 keeps hits in
+                    // memory while bounding staleness under the arena's follow-the-disk
+                    // window; past it the cache revalidates against the handler below.
+                    Cache::new(InMemoryStorage::new()).shared(),
+                    |conn: Conn| async move {
+                        conn.with_response_header(KnownHeaderName::CacheControl, "max-age=1")
+                    },
+                    StaticFileHandler::new(static_dir).with_precompressed(),
+                ),
+            )
+            .get("/async-db", async_db)
+            .get("/fortunes", fortunes)
+            .get("/crud/items", crud_list)
+            .post("/crud/items", crud_create)
+            .get("/crud/items/:id", crud_read)
+            .put("/crud/items/:id", crud_update)
+            // production-stack. `/public/*` is the same work as the isolated profiles under a
+            // path the edge forwards without auth; `/api/*` arrives already authenticated, with
+            // the user id in a header the edge set.
+            .get("/public/baseline", baseline_get)
+            .get("/public/json/:count", json_handler)
+            .get("/api/items/:id", api_item_read)
+            .post("/api/items/:id", api_item_write)
+            .get("/api/me", api_me)
+            .get("/ws", websocket(ws_echo)),
+    )
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+
+    let state = AppState::init();
+
+    let cert = fs::read(env::var("TLS_CERT").unwrap_or_else(|_| "/certs/server.crt".into())).ok();
+    let key = fs::read(env::var("TLS_KEY").unwrap_or_else(|_| "/certs/server.key".into())).ok();
+
+    let tls_port: u16 = env::var("TLS_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8443);
+
+    let http_config = HttpConfig::default().with_received_body_max_len(32 * 1024 * 1024);
+
+    let mut builder = config()
+        .with_nodelay()
+        .with_http_config(http_config)
+        .with_shared_state(state)
+        .listeners()
+        .bind_tcp(8080)?
+        .bind_tcp(8082)?;
+
+    if let Ok(uds) = env::var("LISTEN_UDS") {
+        let _ = std::fs::remove_file(&uds);
+        builder = builder.bind_uds(uds)?;
+    }
+
+    if let (Some(cert), Some(key)) = (cert.as_deref(), key.as_deref()) {
+        builder = builder
+            .bind_tls(8081, RustlsAcceptor::from_single_cert_no_h2(cert, key))?
+            .bind_tls(tls_port, RustlsAcceptor::from_single_cert(cert, key))?
+            .bind_quic(tls_port, QuicConfig::from_single_cert(cert, key))?;
+    } else {
+        log::warn!("TLS cert/key not found; only port 8080 is listening");
+    }
+
+    builder.run(build_handler());
+    Ok(())
+}

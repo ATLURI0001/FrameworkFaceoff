@@ -1,0 +1,44 @@
+Oct 07, 2026 6:03:12 PM robaho.net.httpserver.ServerImpl <init>
+INFO: [http:8080] server bound to /0.0.0.0:8080 with backlog 8192
+Oct 07, 2026 6:03:12 PM robaho.net.httpserver.ServerImpl start
+INFO: [http:8080] using java.util.concurrent.ThreadPerTaskExecutor@c017175 as executor
+Server running on port 8080
+Oct 07, 2026 6:03:12 PM robaho.net.httpserver.ServerImpl <init>
+INFO: [https:8081] server bound to /0.0.0.0:8081 with backlog 8192
+Oct 07, 2026 6:03:12 PM robaho.net.httpserver.ServerImpl start
+INFO: [https:8081] using java.util.concurrent.ThreadPerTaskExecutor@793d163b as executor
+Server running on port 8081 (TLS)
+Oct 07, 2026 6:03:17 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:45582 with 0 requests
+Oct 07, 2026 6:03:17 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:45552 with 0 requests
+Oct 07, 2026 6:03:17 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:45580 with 0 requests
+Oct 07, 2026 6:03:18 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:45564 with 0 requests
+Oct 07, 2026 6:03:18 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:45600 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17848 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17836 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17862 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17804 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17856 with 0 requests
+Oct 07, 2026 6:03:25 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:17858 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30188 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30182 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30178 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30202 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30218 with 0 requests
+Oct 07, 2026 6:03:32 PM robaho.net.httpserver.HttpConnection close
+WARNING: closing connection: remote /127.0.0.1:30212 with 0 requests

@@ -1,0 +1,21 @@
+{
+  "display_name": "deno",
+  "language": "TS",
+  "type": "engine",
+  "engine": "deno",
+  "description": "Deno's own HTTP server, Deno.serve, with no framework and no router on top. The only dependencies are pg and ioredis over npm: specifiers, which the database profiles cannot run without.",
+  "repo": "https://github.com/denoland/deno",
+  "enabled": true,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "static-tls",
+    "async-db",
+    "fortunes"
+  ],
+  "maintainers": []
+}

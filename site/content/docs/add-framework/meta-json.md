@@ -1,0 +1,70 @@
+---
+title: meta.json
+seo_title: "meta.json Reference"
+description: "Every field in a framework's meta.json: display name, language, type, mode, engine, maintainers, and the tests the entry subscribes to."
+---
+
+Create a `meta.json` file in your framework directory:
+
+```json
+{
+  "display_name": "your-framework",
+  "language": "Go",
+  "engine": "net/http",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": { "routing": true, "middleware": true, "request": true, "response": true },
+  "description": "Short description of the framework and its key features.",
+  "repo": "https://github.com/org/repo",
+  "enabled": true,
+  "tests": ["baseline", "pipelined", "limited-conn", "json-comp", "8gbit", "baseline-h2"],
+  "maintainers": ["your-github-username"]
+}
+```
+
+## Fields
+
+| Field | Description |
+|-------|-------------|
+| `display_name` | Name shown on the leaderboard |
+| `language` | Programming language (e.g., `Go`, `Rust`, `C#`, `Java`) |
+| `engine` | HTTP server engine (e.g., `Kestrel`, `Tomcat`, `hyper`) |
+| `type` | `flagship`, `emerging` or `experimental` for frameworks - servers you write application code against, tiered by how production-proven they are; `engine` for implementations applications are not written against (raw sockets, WSGI/ASGI hosts); `infrastructure` for reverse proxies / static-file servers. See [Implementation Rules](implementation-rules/) |
+| `mode` | Frameworks only: `standard` (default - idiomatic, production-style usage) or `tuned` (non-default config / optimizations) |
+| `completeness` | Frameworks only: which of `routing`, `middleware`, `request` and `response` the framework does for you. Each one set to `false` takes 2.5% off the composite; an axis you leave out reads as done, and omitting the field scores a full ×1.00. Omit it entirely on an entry that runs only WebSocket or gRPC profiles - the factor never applies on those boards. See [Completeness](/docs/scoring/completeness/) |
+| `description` | Shown in the framework detail popup on the leaderboard |
+| `repo` | Link to the framework's source repository |
+| `website` | Optional link to the framework's official website |
+| `enabled` | Set to `false` to skip this framework during benchmark runs |
+| `tests` | Array of test profiles this framework participates in |
+| `maintainers` | Array of GitHub usernames to notify when a PR modifies this framework |
+
+## Available test profiles
+
+| Profile | Protocol | Required endpoints |
+|---------|----------|--------------------|
+| `baseline` | HTTP/1.1 | `/baseline11` |
+| `pipelined` | HTTP/1.1 | `/pipeline` |
+| `limited-conn` | HTTP/1.1 | `/baseline11` |
+| `json-comp` | HTTP/1.1 | `/json/{count}?m=N` (must honor `Accept-Encoding: gzip, br`) |
+| `json-tls` | HTTP/1.1 + TLS | `/json/{count}?m=N` (port 8081, ALPN `http/1.1`) |
+| `8gbit` | HTTP/1.1 + TLS | `POST /echo` on port 8081 (10 KB echoed verbatim) |
+| `api-4` | HTTP/1.1 | `/baseline11`, `/json/{count}`, `/async-db` (4 CPU, 16 GB) |
+| `api-16` | HTTP/1.1 | `/baseline11`, `/json/{count}`, `/async-db` (16 CPU, 32 GB) |
+| `async-db` | HTTP/1.1 | `/async-db?min=X&max=Y&limit=N` (requires `DATABASE_URL`) |
+| `baseline-h2` | HTTP/2 | `/baseline2` (TLS, port 8443) |
+| `static-h2` | HTTP/2 | `/static/*` (TLS, port 8443) |
+| `baseline-h2c` | HTTP/2 cleartext | `/baseline2` (port 8082, prior-knowledge) |
+| `json-h2c` | HTTP/2 cleartext | `/json/{count}?m=N` (port 8082, prior-knowledge) |
+| `baseline-h3` | HTTP/3 | `/baseline2` (QUIC, port 8443) |
+| `static-h3` | HTTP/3 | `/static/*` (QUIC, port 8443) |
+| `gateway-64` | HTTP/2 | Compose stack serving `/static/*`, `/json`, `/async-db`, `/baseline2` (TLS, port 8443) |
+| `gateway-h3` | HTTP/3 | Compose stack serving `/static/*`, `/json`, `/async-db`, `/baseline2` (QUIC, port 8443) |
+| `production-stack` | HTTP/2 | Compose stack: edge + JWT auth sidecar + Redis + server (TLS, port 8443) |
+| `unary-grpc` | gRPC | `BenchmarkService/GetSum` (h2c, port 8080) |
+| `unary-grpc-tls` | gRPC | `BenchmarkService/GetSum` (TLS, port 8443) |
+| `echo-ws` | WebSocket | `/ws` echo (port 8080) |
+
+Only include profiles your framework supports. Frameworks missing a profile simply don't appear in that profile's leaderboard.
+
+Per-profile endpoint contracts, request/response shapes, and validation rules live under the [Test Profiles](/docs/test-profiles/) section - link to the specific profile's Implementation page from your PR description when adding a new framework.

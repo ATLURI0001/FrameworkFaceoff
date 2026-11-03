@@ -1,0 +1,43 @@
+# HttpArena entry for mq-bridge (Rust) — HTTP/1.1 + cleartext HTTP/2 (h2c) on
+# 8080, plus HTTP/2-over-TLS (ALPN h2) on 8443 for the baseline-h2 / static-h2
+# profiles.
+#
+# HttpArena builds each framework from its own directory, so mq-bridge is pulled
+# in via a pinned git reference. hyper-util's auto connection builder serves both
+# HTTP/1.1 and HTTP/2 prior-knowledge (h2c) on the plaintext port; the same
+# builder runs behind the TLS listener, where the library now advertises ALPN
+# `h2`. Pinned to a released `tag` so benchmarks are reproducible.
+[package]
+name = "httparena-mqbridge"
+version = "0.1.1"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "httparena-mqbridge"
+path = "src/main.rs"
+
+[dependencies]
+# `rustls-ring` selects the ring crypto provider for the TLS (8443) listener;
+# `sqlx` pulls in the library's re-exported sqlx (`mq_bridge::sqlx`) for the
+# async-db and crud profiles, keeping one sqlx version in the graph.
+mq-bridge = { git = "https://github.com/marcomq/mq-bridge", tag = "v0.4.8", default-features = false, features = ["http", "rustls-ring", "sqlx"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+# Zero-copy response bodies.
+bytes = "1"
+# Sharded concurrent map behind the crud profile's cache-aside read path.
+dashmap = "6"
+# Template engine for the fortunes profile: compile-time, auto-escaping, and
+# the template lives in its own file, as the profile's standard-mode rules require.
+askama = "0.16"
+# Install the process-default rustls crypto provider before the TLS endpoint.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"

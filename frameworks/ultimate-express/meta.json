@@ -1,0 +1,28 @@
+{
+  "display_name": "ultimate-express",
+  "language": "JS",
+  "type": "emerging",
+  "mode": "tuned",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "uwebsockets",
+  "description": "ultimate-express (Express API on uWebSockets.js) with the cluster module for multi-core scaling.",
+  "repo": "https://github.com/dimdenGD/ultimate-express",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db",
+    "static-tls",
+    "fortunes"
+  ],
+  "maintainers": []
+}

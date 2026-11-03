@@ -1,0 +1,49 @@
+data.dir: "/data"
+cert.dir: "/certs"
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  sockets:
+    - name: "h2-tls" # HTTP/2, grpc
+      host: "0.0.0.0"
+      port: 8443
+      tls:
+        private-key:
+          pem:
+            key:
+              resource:
+                path: "${cert.dir}/server.key"
+            cert-chain:
+              resource:
+                path: "${cert.dir}/server.crt"
+    - name: "h1-tls"  # json-tls, static-tls, 8gbit
+      host: "0.0.0.0"
+      port: 8081
+      # benchmark requires http/1.1 only on this port
+      protocols-discover-services: false
+      protocols:
+        http_1_1: {}
+      tls:
+        private-key:
+          pem:
+            key:
+              resource:
+                path: "${cert.dir}/server.key"
+            cert-chain:
+              resource:
+                path: "${cert.dir}/server.crt"
+    - name: "h2c"  # baseline-h2c, json-h2c
+      host: "0.0.0.0"
+      port: 8082
+      # benchmark requires prior-knowledge HTTP/2 only on this port
+      protocols-discover-services: false
+      protocols:
+        http_2: {}
+  features:
+    static-content:
+      sockets: ["@default", "h1-tls", "h2-tls"]
+      pre-compressed-enabled: true
+      path:
+        - context: "/static"
+          location: "${data.dir}/static"

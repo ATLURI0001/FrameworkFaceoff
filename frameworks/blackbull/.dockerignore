@@ -1,0 +1,7 @@
+**
+!requirements.txt
+!app.py
+!db.py
+!launcher.py
+**/__pycache__/
+**/*.pyc

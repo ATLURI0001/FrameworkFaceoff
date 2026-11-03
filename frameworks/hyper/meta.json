@@ -1,0 +1,17 @@
+{
+  "display_name": "hyper",
+  "language": "Rust",
+  "type": "engine",
+  "engine": "hyper",
+  "description": "Low-level HTTP library for Rust, built on tokio with multi-threaded async runtime.",
+  "repo": "https://github.com/hyperium/hyper",
+  "enabled": true,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "baseline-h2",
+    "static-h2"
+  ],
+  "maintainers": []
+}

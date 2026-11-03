@@ -1,0 +1,15 @@
+{
+  "display_name": "aspnet-minimal",
+  "language": "C#",
+  "type": "flagship",
+  "mode": "standard",
+  "engine": "kestrel",
+  "description": "ASP.NET Core gRPC server using .NET 10 preview with Kestrel.",
+  "repo": "https://github.com/dotnet/aspnetcore",
+  "enabled": true,
+  "tests": [
+    "unary-grpc",
+    "unary-grpc-tls"
+  ],
+  "maintainers": []
+}

@@ -1,0 +1,27 @@
+{
+  "display_name": "django",
+  "language": "Python",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": true,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "uvicorn",
+  "description": "Django 6.1 as an ASGI application on Uvicorn. URLconf routing and path converters through the Django API, JsonResponse for the JSON payload, GZipMiddleware for compression. Postgres through asyncpg for async-db and fortunes, the latter rendered per request by the Django Template Language from a template file, with the cached loader in front of it.",
+  "repo": "https://github.com/django/django",
+  "enabled": true,
+  "tests": [
+    "baseline", "async", "latency-1m", "latency-10k", "latency-500k-8cpu",
+    "pipelined",
+    "limited-conn",
+    "json-comp",
+    "json-tls",
+    "8gbit",
+    "async-db",
+    "fortunes"
+  ],
+  "maintainers": []
+}

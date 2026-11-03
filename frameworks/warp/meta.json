@@ -1,0 +1,25 @@
+{
+  "display_name": "warp",
+  "language": "Haskell",
+  "type": "flagship",
+  "mode": "standard",
+  "completeness": {
+    "routing": false,
+    "middleware": true,
+    "request": true,
+    "response": true
+  },
+  "engine": "warp",
+  "description": "Warp 3.3 serving a plain WAI Application on the threaded GHC runtime, default configuration, one capability per core. Routing on the WAI request path, JSON through the aeson encoding API, gzip through the wai-extra Gzip middleware.",
+  "repo": "https://github.com/yesodweb/wai",
+  "enabled": false,
+  "tests": [
+    "baseline", "latency-1m", "latency-10k",
+    "pipelined",
+    "limited-conn",
+    "json-tls",
+    "json-comp",
+    "8gbit"
+  ],
+  "maintainers": []
+}
