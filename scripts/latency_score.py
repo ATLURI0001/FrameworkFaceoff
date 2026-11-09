@@ -81,11 +81,21 @@ def to_us(value) -> float | None:
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    m = re.match(r"\s*([\d.]+)\s*(us|ms|s)?\s*$", str(value))
+    m = re.match(r"\s*([\d.]+)\s*(ns|us|µs|μs|ms|s|m)?\s*$", str(value))
     if not m:
         return None
     v = float(m.group(1))
-    return v * {"us": 1.0, "ms": 1e3, "s": 1e6, None: 1.0}[m.group(2)]
+    mult = {
+        "ns": 1e-3,
+        "us": 1.0,
+        "µs": 1.0,
+        "μs": 1.0,
+        "ms": 1e3,
+        "s": 1e6,
+        "m": 60e6,
+        None: 1.0,
+    }
+    return v * mult[m.group(2)]
 
 
 def _clamp(v: float) -> float:
@@ -99,7 +109,7 @@ def rate_factor(rps: float, full: float) -> float:
 def decade_score(value: float | None, best: float | None,
                  decades: float = DECADES) -> float:
     """1.0 at the best value, falling to 0 over `decades` decades above it."""
-    if not value or not best or value <= 0 or best <= 0:
+    if not value or not best or value <= 0 or best <= 0 or decades <= 0:
         return 0.0
     return _clamp(1.0 - math.log10(max(value, best) / best) / decades)
 
