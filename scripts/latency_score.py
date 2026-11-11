@@ -77,14 +77,20 @@ MEAN_DECADES = 1.0   # mean: ten times the best is zero
 
 def to_us(value) -> float | None:
     """'173.0us' / '1.5ms' / '2s' -> microseconds. None when unparseable."""
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
     if isinstance(value, (int, float)):
-        return float(value)
-    m = re.match(r"\s*([\d.]+)\s*(ns|us|µs|μs|ms|s|m)?\s*$", str(value))
+        fval = float(value)
+        return fval if math.isfinite(fval) else None
+    m = re.match(r"\s*(\d+(?:\.\d*)?|\.\d+)\s*(ns|us|µs|μs|ms|s|m)?\s*$", str(value))
     if not m:
         return None
-    v = float(m.group(1))
+    try:
+        v = float(m.group(1))
+    except ValueError:
+        return None
+    if not math.isfinite(v):
+        return None
     mult = {
         "ns": 1e-3,
         "us": 1.0,
@@ -99,7 +105,9 @@ def to_us(value) -> float | None:
 
 
 def _clamp(v: float) -> float:
-    return 0.0 if v < 0 else 1.0 if v > 1 else v
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or math.isnan(v):
+        return 0.0
+    return 0.0 if v < 0 else 1.0 if v > 1 else float(v)
 
 
 def rate_factor(rps: float, full: float) -> float:
@@ -128,7 +136,14 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
     board gets them normalised against the field.
     """
     def best_of(key):
-        vals = [r[key] for r in rows if r.get(key)]
+        vals = [
+            float(r[key])
+            for r in rows
+            if isinstance(r.get(key), (int, float))
+            and not isinstance(r.get(key), bool)
+            and math.isfinite(r[key])
+            and r[key] > 0
+        ]
         return min(vals) if vals else None
 
     b_cpu, b_p99, b_mean = best_of("cpu"), best_of("p99"), best_of("mean")
