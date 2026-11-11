@@ -153,6 +153,23 @@ class TestLatencyScore(unittest.TestCase):
             winning_run = pick(tmpdir, "latency-1m")
             self.assertEqual(winning_run, 2)
 
+    def test_nan_boolean_and_negative_outlier_guards(self):
+        self.assertIsNone(to_us(True))
+        self.assertIsNone(to_us(float("nan")))
+        self.assertIsNone(to_us(float("inf")))
+        self.assertIsNone(to_us("1.2.3ms"))
+        self.assertEqual(_clamp(float("nan")), 0.0)
+
+        rows = [
+            {"rps": 950_000, "cpu": -5.0, "p99": float("nan"), "mean": 100.0},
+            {"rps": 950_000, "cpu": 1.0, "p99": 200.0, "mean": 100.0},
+            {"rps": 950_000, "cpu": 2.0, "p99": 2000.0, "mean": 1000.0},
+        ]
+        scored = score_rows(rows, profile="latency-1m")
+        # Negative/NaN corrupt row 0 must NOT poison best_of for valid row 1
+        self.assertAlmostEqual(scored[1]["score"], 100.0)
+        self.assertTrue(scored[2]["score"] > 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
