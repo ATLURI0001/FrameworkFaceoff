@@ -170,6 +170,27 @@ class TestLatencyScore(unittest.TestCase):
         self.assertAlmostEqual(scored[1]["score"], 100.0)
         self.assertTrue(scored[2]["score"] > 0.0)
 
+        # Boolean values must not be treated as numeric 1.0 in scoring helpers
+        self.assertEqual(rate_factor(True, 950_000.0), 0.0)
+        self.assertEqual(linear_score(True, 1.0), 0.0)
+        self.assertEqual(decade_score(True, 1.0), 0.0)
+        self.assertEqual(decade_score(100.0, float("nan")), 0.0)
+
+        with self.assertRaises(ValueError):
+            score_rows([{"rps": 1000}], profile="unknown-profile")
+
+    def test_pick_handles_corrupt_rps_and_breaks_ties_deterministically(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            (tmppath / "1.kv").write_text("status_2xx=100\nrps=not-a-number\n")
+            (tmppath / "2.kv").write_text("status_2xx=500\nrps=950000\np99_lat=100us\navg_lat=50us\n")
+            (tmppath / "2.meta").write_text("cpu_usec=250000\n")
+            (tmppath / "10.kv").write_text("status_2xx=500\nrps=950000\np99_lat=100us\navg_lat=50us\n")
+            (tmppath / "10.meta").write_text("cpu_usec=250000\n")
+
+            # Run 1 has corrupt rps (handled without crashing); runs 2 and 10 tie -> lowest run number (2) wins
+            self.assertEqual(pick(tmpdir, "latency-1m"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
