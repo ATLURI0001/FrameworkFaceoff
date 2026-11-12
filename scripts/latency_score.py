@@ -105,27 +105,44 @@ def to_us(value) -> float | None:
 
 
 def _clamp(v: float) -> float:
-    if not isinstance(v, (int, float)) or isinstance(v, bool) or math.isnan(v):
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v):
         return 0.0
     return 0.0 if v < 0 else 1.0 if v > 1 else float(v)
 
 
+def _positive_finite(v) -> float | None:
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return None
+    fv = float(v)
+    return fv if math.isfinite(fv) and fv > 0 else None
+
+
 def rate_factor(rps: float, full: float) -> float:
-    return _clamp(rps / full)
+    if not isinstance(rps, (int, float)) or isinstance(rps, bool) or not math.isfinite(rps):
+        return 0.0
+    full_val = _positive_finite(full)
+    if full_val is None:
+        return 0.0
+    return _clamp(float(rps) / full_val)
 
 
 def decade_score(value: float | None, best: float | None,
                  decades: float = DECADES) -> float:
     """1.0 at the best value, falling to 0 over `decades` decades above it."""
-    if not value or not best or value <= 0 or best <= 0 or decades <= 0:
+    val = _positive_finite(value)
+    best_val = _positive_finite(best)
+    dec_val = _positive_finite(decades)
+    if val is None or best_val is None or dec_val is None:
         return 0.0
-    return _clamp(1.0 - math.log10(max(value, best) / best) / decades)
+    return _clamp(1.0 - math.log10(max(val, best_val) / best_val) / dec_val)
 
 
 def linear_score(value: float | None, best: float | None) -> float:
-    if not value or not best or value <= 0 or best <= 0:
+    val = _positive_finite(value)
+    best_val = _positive_finite(best)
+    if val is None or best_val is None:
         return 0.0
-    return _clamp(best / value)
+    return _clamp(best_val / val)
 
 
 def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
@@ -135,6 +152,9 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
     three runs gets them normalised against each other, and a caller scoring the
     board gets them normalised against the field.
     """
+    if profile not in FULL_RATE:
+        raise ValueError(f"Unknown profile: {profile!r}")
+
     def best_of(key):
         vals = [
             float(r[key])
@@ -147,8 +167,9 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
         return min(vals) if vals else None
 
     b_cpu, b_p99, b_mean = best_of("cpu"), best_of("p99"), best_of("mean")
+    full = FULL_RATE[profile]
     for r in rows:
-        rf = rate_factor(r.get("rps") or 0, FULL_RATE[profile])
+        rf = rate_factor(r.get("rps") or 0, full)
         cpu_s = linear_score(r.get("cpu"), b_cpu)
         p99_s = decade_score(r.get("p99"), b_p99)
         mean_s = decade_score(r.get("mean"), b_mean, MEAN_DECADES)
@@ -182,20 +203,26 @@ def pick(dirpath: str, profile: str = DEFAULT_PROFILE) -> int | None:
             cpu_usec = float(meta.get("cpu_usec") or 0)
         except ValueError:
             reqs = cpu_usec = 0.0
+        try:
+            rps = float(kv.get("rps") or 0)
+            if not math.isfinite(rps) or rps < 0:
+                rps = 0.0
+        except ValueError:
+            rps = 0.0
         rows.append({
             "run": int(n),
-            "rps": float(kv.get("rps") or 0),
+            "rps": rps,
             # Per-request CPU, which is what the published metric is. Falls back
             # to None when the cgroup read failed, and linear_score treats that
             # as zero rather than as free.
-            "cpu": (cpu_usec / reqs) if (reqs > 0 and cpu_usec > 0) else None,
+            "cpu": (cpu_usec / reqs) if (reqs > 0 and cpu_usec > 0 and math.isfinite(reqs) and math.isfinite(cpu_usec)) else None,
             "p99": to_us(kv.get("p99_lat")),
             "mean": to_us(kv.get("avg_lat")),
         })
     if not rows:
         return None
     score_rows(rows, profile)
-    return max(rows, key=lambda r: (r["score"], r["rps"]))["run"]
+    return max(rows, key=lambda r: (r["score"], r["rps"], -r["run"]))["run"]
 
 
 def table(results_dir: Path, profile: str = DEFAULT_PROFILE) -> None:
