@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from latency_score import (
     to_us,
     _clamp,
+    _kv,
     rate_factor,
     decade_score,
     linear_score,
@@ -190,6 +191,20 @@ class TestLatencyScore(unittest.TestCase):
 
             # Run 1 has corrupt rps (handled without crashing); runs 2 and 10 tie -> lowest run number (2) wins
             self.assertEqual(pick(tmpdir, "latency-1m"), 2)
+
+    def test_kv_parser_robustness(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            f = tmppath / "test.kv"
+            f.write_text("# Comment line\n  rps = 950000 \ncpu_usec= 12345\n\n# another comment\nstatus_2xx=950000\n", encoding="utf-8")
+            res = _kv(f)
+            self.assertEqual(res["rps"], "950000")
+            self.assertEqual(res["cpu_usec"], "12345")
+            self.assertEqual(res["status_2xx"], "950000")
+            self.assertNotIn("#", res)
+
+            # Non-existent path returns empty dict without throwing
+            self.assertEqual(_kv(tmppath / "missing.kv"), {})
 
 
 if __name__ == "__main__":

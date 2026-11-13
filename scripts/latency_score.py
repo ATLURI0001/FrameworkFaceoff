@@ -181,10 +181,17 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
 
 def _kv(path: Path) -> dict:
     out = {}
-    for line in path.read_text().splitlines():
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except (OSError, UnicodeError):
+        return out
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
         if "=" in line:
             k, v = line.split("=", 1)
-            out[k] = v
+            out[k.strip()] = v.strip()
     return out
 
 
@@ -229,7 +236,7 @@ def table(results_dir: Path, profile: str = DEFAULT_PROFILE) -> None:
     rows = []
     for f in sorted(results_dir.glob("*.json")):
         try:
-            d = json.loads(f.read_text())
+            d = json.loads(f.read_text(encoding="utf-8", errors="replace"))
         except Exception:
             continue
         for key, r in (d.get("results") or {}).items():
