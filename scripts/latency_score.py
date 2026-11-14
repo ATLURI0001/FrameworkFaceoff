@@ -81,15 +81,16 @@ def to_us(value) -> float | None:
         return None
     if isinstance(value, (int, float)):
         fval = float(value)
-        return fval if math.isfinite(fval) else None
-    m = re.match(r"\s*(\d+(?:\.\d*)?|\.\d+)\s*(ns|us|µs|μs|ms|s|m)?\s*$", str(value))
+        return fval if math.isfinite(fval) and fval >= 0 else None
+    val_str = str(value).strip().replace(",", "").replace("_", "")
+    m = re.match(r"^(\d+(?:\.\d*)?|\.\d+)\s*(ns|us|µs|μs|ms|s|m)?$", val_str)
     if not m:
         return None
     try:
         v = float(m.group(1))
     except ValueError:
         return None
-    if not math.isfinite(v):
+    if not math.isfinite(v) or v < 0:
         return None
     mult = {
         "ns": 1e-3,
@@ -145,7 +146,11 @@ def linear_score(value: float | None, best: float | None) -> float:
     return _clamp(best_val / val)
 
 
-def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
+def score_rows(
+    rows: list[dict],
+    profile: str = DEFAULT_PROFILE,
+    weights: tuple[float, float, float] = (W_CPU, W_P99, W_MEAN),
+) -> list[dict]:
     """Annotate rows with their score. Each row needs rps, cpu, p99, mean.
 
     Bests are taken over the rows given, so a caller scoring one framework's
@@ -155,11 +160,19 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
     if profile not in FULL_RATE:
         raise ValueError(f"Unknown profile: {profile!r}")
 
+    w_cpu = _positive_finite(weights[0]) if len(weights) > 0 else W_CPU
+    w_p99 = _positive_finite(weights[1]) if len(weights) > 1 else W_P99
+    w_mean = _positive_finite(weights[2]) if len(weights) > 2 else W_MEAN
+    w_cpu = w_cpu if w_cpu is not None else W_CPU
+    w_p99 = w_p99 if w_p99 is not None else W_P99
+    w_mean = w_mean if w_mean is not None else W_MEAN
+
     def best_of(key):
         vals = [
             float(r[key])
             for r in rows
-            if isinstance(r.get(key), (int, float))
+            if isinstance(r, dict)
+            and isinstance(r.get(key), (int, float))
             and not isinstance(r.get(key), bool)
             and math.isfinite(r[key])
             and r[key] > 0
@@ -169,13 +182,15 @@ def score_rows(rows: list[dict], profile: str = DEFAULT_PROFILE) -> list[dict]:
     b_cpu, b_p99, b_mean = best_of("cpu"), best_of("p99"), best_of("mean")
     full = FULL_RATE[profile]
     for r in rows:
+        if not isinstance(r, dict):
+            continue
         rf = rate_factor(r.get("rps") or 0, full)
         cpu_s = linear_score(r.get("cpu"), b_cpu)
         p99_s = decade_score(r.get("p99"), b_p99)
         mean_s = decade_score(r.get("mean"), b_mean, MEAN_DECADES)
         r["rateFactor"] = rf
         r["cpuScore"], r["p99Score"], r["meanScore"] = cpu_s, p99_s, mean_s
-        r["score"] = 100.0 * rf * (W_CPU * cpu_s + W_P99 * p99_s + W_MEAN * mean_s)
+        r["score"] = 100.0 * rf * (w_cpu * cpu_s + w_p99 * p99_s + w_mean * mean_s)
     return rows
 
 
@@ -195,9 +210,11 @@ def _kv(path: Path) -> dict:
     return out
 
 
-def pick(dirpath: str, profile: str = DEFAULT_PROFILE) -> int | None:
+def pick(dirpath: str | Path, profile: str = DEFAULT_PROFILE) -> int | None:
     """Best of the runs recorded under dirpath. Prints nothing on failure."""
     d = Path(dirpath)
+    if not d.is_dir():
+        return None
     rows = []
     for kv_file in sorted(d.glob("*.kv")):
         n = kv_file.stem
