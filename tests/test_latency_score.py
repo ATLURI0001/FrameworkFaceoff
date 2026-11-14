@@ -206,6 +206,23 @@ class TestLatencyScore(unittest.TestCase):
             # Non-existent path returns empty dict without throwing
             self.assertEqual(_kv(tmppath / "missing.kv"), {})
 
+    def test_to_us_with_delimiters_and_negative_guards(self):
+        self.assertAlmostEqual(to_us("1,500us"), 1500.0)
+        self.assertAlmostEqual(to_us("1_000ms"), 1000000.0)
+        self.assertIsNone(to_us(-10.0))
+        self.assertIsNone(to_us("-50us"))
+
+    def test_pick_non_directory_and_custom_weights(self):
+        self.assertIsNone(pick("non_existent_dir_12345"))
+
+        rows = [
+            None,  # malformed row
+            {"rps": 950_000, "cpu": 1.0, "p99": 200.0, "mean": 100.0},
+        ]
+        # Custom weights: 80% CPU, 10% p99, 10% mean
+        scored = score_rows(rows, profile="latency-1m", weights=(0.8, 0.1, 0.1))
+        self.assertAlmostEqual(scored[1]["score"], 100.0)
+
 
 if __name__ == "__main__":
     unittest.main()
