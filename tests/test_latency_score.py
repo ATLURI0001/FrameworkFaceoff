@@ -17,6 +17,8 @@ from latency_score import (
     linear_score,
     score_rows,
     pick,
+    normalize_weights,
+    format_score_summary,
     FULL_RATE,
     DEFAULT_PROFILE,
 )
@@ -222,6 +224,46 @@ class TestLatencyScore(unittest.TestCase):
         # Custom weights: 80% CPU, 10% p99, 10% mean
         scored = score_rows(rows, profile="latency-1m", weights=(0.8, 0.1, 0.1))
         self.assertAlmostEqual(scored[1]["score"], 100.0)
+
+    def test_case_insensitive_units_and_variations(self):
+        self.assertAlmostEqual(to_us("150 US"), 150.0)
+        self.assertAlmostEqual(to_us("2.5 MS"), 2500.0)
+        self.assertAlmostEqual(to_us("3 SEC"), 3000000.0)
+        self.assertAlmostEqual(to_us("1.5 seconds"), 1500000.0)
+        self.assertAlmostEqual(to_us("2 mins"), 120000000.0)
+        self.assertAlmostEqual(to_us("500 NS"), 0.5)
+
+    def test_normalize_weights(self):
+        # Already normalized
+        w = normalize_weights((0.5, 0.25, 0.25))
+        self.assertAlmostEqual(w[0], 0.5)
+        self.assertAlmostEqual(w[1], 0.25)
+        self.assertAlmostEqual(w[2], 0.25)
+
+        # Raw percentage integers (e.g. 50, 25, 25)
+        w2 = normalize_weights((50.0, 25.0, 25.0))
+        self.assertAlmostEqual(w2[0], 0.5)
+        self.assertAlmostEqual(w2[1], 0.25)
+        self.assertAlmostEqual(w2[2], 0.25)
+
+        # Empty / invalid fallback
+        self.assertEqual(normalize_weights(None), (0.5, 0.25, 0.25))
+        self.assertEqual(normalize_weights((0, 0, 0)), (0.5, 0.25, 0.25))
+
+    def test_format_score_summary(self):
+        row = {
+            "framework": "fastapi",
+            "score": 87.54,
+            "rateFactor": 1.0,
+            "cpuScore": 0.85,
+            "p99Score": 0.92,
+            "meanScore": 0.88,
+        }
+        summary = format_score_summary(row)
+        self.assertIn("fastapi: score=87.5", summary)
+        self.assertIn("rateFactor=1.000", summary)
+        self.assertIn("cpuScore=0.85", summary)
+        self.assertEqual(format_score_summary(None), "invalid_row")
 
 
 if __name__ == "__main__":

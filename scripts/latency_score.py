@@ -83,7 +83,7 @@ def to_us(value) -> float | None:
         fval = float(value)
         return fval if math.isfinite(fval) and fval >= 0 else None
     val_str = str(value).strip().replace(",", "").replace("_", "")
-    m = re.match(r"^(\d+(?:\.\d*)?|\.\d+)\s*(ns|us|µs|μs|ms|s|m)?$", val_str)
+    m = re.match(r"^(\d+(?:\.\d*)?|\.\d+)\s*(ns|us|µs|μs|ms|s|sec|secs|second|seconds|m|min|mins)?$", val_str, re.IGNORECASE)
     if not m:
         return None
     try:
@@ -92,6 +92,7 @@ def to_us(value) -> float | None:
         return None
     if not math.isfinite(v) or v < 0:
         return None
+    unit = (m.group(2) or "").lower()
     mult = {
         "ns": 1e-3,
         "us": 1.0,
@@ -99,10 +100,16 @@ def to_us(value) -> float | None:
         "μs": 1.0,
         "ms": 1e3,
         "s": 1e6,
+        "sec": 1e6,
+        "secs": 1e6,
+        "second": 1e6,
+        "seconds": 1e6,
         "m": 60e6,
-        None: 1.0,
+        "min": 60e6,
+        "mins": 60e6,
+        "": 1.0,
     }
-    return v * mult[m.group(2)]
+    return v * mult.get(unit, 1.0)
 
 
 def _clamp(v: float) -> float:
@@ -146,6 +153,34 @@ def linear_score(value: float | None, best: float | None) -> float:
     return _clamp(best_val / val)
 
 
+def normalize_weights(weights: tuple[float, float, float] | list[float] | None = None) -> tuple[float, float, float]:
+    """Normalize 3-element scoring weights to sum to 1.0. Defaults to (W_CPU, W_P99, W_MEAN)."""
+    if not weights or len(weights) < 3:
+        return (W_CPU, W_P99, W_MEAN)
+    w_cpu = _positive_finite(weights[0])
+    w_p99 = _positive_finite(weights[1])
+    w_mean = _positive_finite(weights[2])
+    if w_cpu is None or w_p99 is None or w_mean is None:
+        return (W_CPU, W_P99, W_MEAN)
+    total = w_cpu + w_p99 + w_mean
+    if total <= 0:
+        return (W_CPU, W_P99, W_MEAN)
+    return (w_cpu / total, w_p99 / total, w_mean / total)
+
+
+def format_score_summary(row: dict) -> str:
+    """Format row scoring metrics into a concise single-line diagnostic."""
+    if not isinstance(row, dict):
+        return "invalid_row"
+    fw = str(row.get("framework") or row.get("fw") or "unknown")
+    score = float(row.get("score") or 0.0)
+    rf = float(row.get("rateFactor") or 0.0)
+    cpu_s = float(row.get("cpuScore") or 0.0)
+    p99_s = float(row.get("p99Score") or 0.0)
+    mean_s = float(row.get("meanScore") or 0.0)
+    return f"{fw}: score={score:.1f} (rateFactor={rf:.3f}, cpuScore={cpu_s:.2f}, p99Score={p99_s:.2f}, meanScore={mean_s:.2f})"
+
+
 def score_rows(
     rows: list[dict],
     profile: str = DEFAULT_PROFILE,
@@ -160,12 +195,7 @@ def score_rows(
     if profile not in FULL_RATE:
         raise ValueError(f"Unknown profile: {profile!r}")
 
-    w_cpu = _positive_finite(weights[0]) if len(weights) > 0 else W_CPU
-    w_p99 = _positive_finite(weights[1]) if len(weights) > 1 else W_P99
-    w_mean = _positive_finite(weights[2]) if len(weights) > 2 else W_MEAN
-    w_cpu = w_cpu if w_cpu is not None else W_CPU
-    w_p99 = w_p99 if w_p99 is not None else W_P99
-    w_mean = w_mean if w_mean is not None else W_MEAN
+    w_cpu, w_p99, w_mean = normalize_weights(weights)
 
     def best_of(key):
         vals = [
