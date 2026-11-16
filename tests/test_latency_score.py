@@ -21,6 +21,8 @@ from latency_score import (
     format_score_summary,
     from_us,
     rank_rows,
+    compute_relative_deltas,
+    export_summary_json,
     FULL_RATE,
     DEFAULT_PROFILE,
 )
@@ -289,6 +291,38 @@ class TestLatencyScore(unittest.TestCase):
         self.assertEqual(ranked[1]["rank"], 2)
         self.assertEqual(ranked[2]["framework"], "fw-b")
         self.assertEqual(ranked[2]["rank"], 3)
+
+    def test_compute_relative_deltas(self):
+        rows = [
+            {"framework": "baseline-app", "score": 80.0, "rps": 40000, "p99": 200},
+            {"framework": "fast-app", "score": 100.0, "rps": 60000, "p99": 100},
+        ]
+        deltas = compute_relative_deltas(rows, "baseline-app")
+        # baseline should have 0% deltas
+        self.assertEqual(deltas[0]["deltaScorePct"], 0.0)
+        self.assertEqual(deltas[0]["deltaRpsPct"], 0.0)
+        self.assertEqual(deltas[0]["deltaP99Pct"], 0.0)
+        # fast-app: score +25%, rps +50%, p99 -50%
+        self.assertEqual(deltas[1]["deltaScorePct"], 25.0)
+        self.assertEqual(deltas[1]["deltaRpsPct"], 50.0)
+        self.assertEqual(deltas[1]["deltaP99Pct"], -50.0)
+
+    def test_export_summary_json(self):
+        rows = [
+            {"framework": "fw-1", "score": 50.0},
+            {"framework": "fw-2", "score": 75.0},
+            {"framework": "fw-3", "score": 100.0},
+        ]
+        summary = export_summary_json(rows)
+        self.assertEqual(summary["count"], 3)
+        self.assertEqual(summary["topFramework"], "fw-3")
+        self.assertEqual(summary["maxScore"], 100.0)
+        self.assertEqual(summary["medianScore"], 75.0)
+
+        # Empty / invalid fallback
+        empty_summary = export_summary_json([])
+        self.assertEqual(empty_summary["count"], 0)
+        self.assertIsNone(empty_summary["topFramework"])
 
 
 
