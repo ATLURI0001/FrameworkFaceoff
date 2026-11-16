@@ -19,6 +19,8 @@ from latency_score import (
     pick,
     normalize_weights,
     format_score_summary,
+    from_us,
+    rank_rows,
     FULL_RATE,
     DEFAULT_PROFILE,
 )
@@ -264,6 +266,30 @@ class TestLatencyScore(unittest.TestCase):
         self.assertIn("rateFactor=1.000", summary)
         self.assertIn("cpuScore=0.85", summary)
         self.assertEqual(format_score_summary(None), "invalid_row")
+
+    def test_from_us_formatting(self):
+        self.assertEqual(from_us(150.0, "us"), "150.0us")
+        self.assertEqual(from_us(1500.0, "ms"), "1.50ms")
+        self.assertEqual(from_us(2500000.0, "s"), "2.50s")
+        self.assertEqual(from_us(None), "N/A")
+        self.assertEqual(from_us(float("nan")), "N/A")
+        self.assertEqual(from_us(-10.0), "N/A")
+
+    def test_rank_rows(self):
+        rows = [
+            {"framework": "fw-b", "score": 80.0, "rps": 50000, "p99": 200},
+            {"framework": "fw-a", "score": 92.5, "rps": 90000, "p99": 150},
+            {"framework": "fw-c", "score": 80.0, "rps": 60000, "p99": 180},
+        ]
+        ranked = rank_rows(rows)
+        self.assertEqual(ranked[0]["framework"], "fw-a")
+        self.assertEqual(ranked[0]["rank"], 1)
+        # fw-c beats fw-b on rps tie-break
+        self.assertEqual(ranked[1]["framework"], "fw-c")
+        self.assertEqual(ranked[1]["rank"], 2)
+        self.assertEqual(ranked[2]["framework"], "fw-b")
+        self.assertEqual(ranked[2]["rank"], 3)
+
 
 
 if __name__ == "__main__":

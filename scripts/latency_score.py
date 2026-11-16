@@ -220,8 +220,40 @@ def score_rows(
         mean_s = decade_score(r.get("mean"), b_mean, MEAN_DECADES)
         r["rateFactor"] = rf
         r["cpuScore"], r["p99Score"], r["meanScore"] = cpu_s, p99_s, mean_s
-        r["score"] = 100.0 * rf * (w_cpu * cpu_s + w_p99 * p99_s + w_mean * mean_s)
+        score = 100.0 * rf * (w_cpu * cpu_s + w_p99 * p99_s + w_mean * mean_s)
+        r["score"] = max(0.0, min(100.0, score))
     return rows
+
+
+def from_us(us: float | None, unit: str = "ms") -> str:
+    """Format microseconds back to human-readable string with units (us, ms, s)."""
+    if us is None or isinstance(us, bool) or not isinstance(us, (int, float)) or not math.isfinite(us) or us < 0:
+        return "N/A"
+    clean_unit = unit.lower().strip()
+    if clean_unit in ("us", "µs", "μs"):
+        return f"{us:.1f}us"
+    elif clean_unit in ("s", "sec"):
+        return f"{us / 1e6:.2f}s"
+    return f"{us / 1e3:.2f}ms"
+
+
+def rank_rows(rows: list[dict], reverse: bool = True) -> list[dict]:
+    """Sort scored rows by score descending with tie-breaking on rps and p99, annotating 'rank'."""
+    if not isinstance(rows, list):
+        return []
+    valid_rows = [r for r in rows if isinstance(r, dict)]
+    sorted_rows = sorted(
+        valid_rows,
+        key=lambda r: (
+            float(r.get("score") or 0.0),
+            float(r.get("rps") or 0.0),
+            -float(r.get("p99") or float("inf")),
+        ),
+        reverse=reverse,
+    )
+    for idx, r in enumerate(sorted_rows, start=1):
+        r["rank"] = idx
+    return sorted_rows
 
 
 def _kv(path: Path) -> dict:
