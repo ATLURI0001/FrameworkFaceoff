@@ -256,6 +256,57 @@ def rank_rows(rows: list[dict], reverse: bool = True) -> list[dict]:
     return sorted_rows
 
 
+def compute_relative_deltas(rows: list[dict], baseline_framework: str) -> list[dict]:
+    """Calculate percentage deltas in score, rps, and p99 relative to a baseline framework."""
+    if not isinstance(rows, list) or not isinstance(baseline_framework, str):
+        return []
+    baseline = None
+    for r in rows:
+        if isinstance(r, dict) and r.get("framework") == baseline_framework:
+            baseline = r
+            break
+    if not baseline:
+        return rows
+
+    b_score = float(baseline.get("score") or 0.0)
+    b_rps = float(baseline.get("rps") or 0.0)
+    b_p99 = float(baseline.get("p99") or 0.0)
+
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        score = float(r.get("score") or 0.0)
+        rps = float(r.get("rps") or 0.0)
+        p99 = float(r.get("p99") or 0.0)
+
+        r["deltaScorePct"] = round(((score - b_score) / b_score) * 100.0, 2) if b_score > 0 else 0.0
+        r["deltaRpsPct"] = round(((rps - b_rps) / b_rps) * 100.0, 2) if b_rps > 0 else 0.0
+        r["deltaP99Pct"] = round(((p99 - b_p99) / b_p99) * 100.0, 2) if b_p99 > 0 else 0.0
+
+    return rows
+
+
+def export_summary_json(rows: list[dict]) -> dict:
+    """Export summary metrics including total count, top performer, and score percentiles."""
+    if not isinstance(rows, list):
+        return {"count": 0, "topFramework": None, "medianScore": 0.0, "maxScore": 0.0}
+    valid = [r for r in rows if isinstance(r, dict) and isinstance(r.get("score"), (int, float))]
+    if not valid:
+        return {"count": 0, "topFramework": None, "medianScore": 0.0, "maxScore": 0.0}
+
+    scores = sorted(float(r["score"]) for r in valid)
+    n = len(scores)
+    median = (scores[n // 2] if n % 2 != 0 else (scores[n // 2 - 1] + scores[n // 2]) / 2.0)
+    top_row = max(valid, key=lambda r: float(r.get("score") or 0.0))
+
+    return {
+        "count": len(valid),
+        "topFramework": top_row.get("framework"),
+        "maxScore": round(float(top_row.get("score") or 0.0), 2),
+        "medianScore": round(median, 2),
+    }
+
+
 def _kv(path: Path) -> dict:
     out = {}
     try:
