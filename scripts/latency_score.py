@@ -307,6 +307,69 @@ def export_summary_json(rows: list[dict]) -> dict:
     }
 
 
+def compute_efficiency_ratio(cpu_us: float | None, rps: float | None) -> float | None:
+    """Calculate throughput efficiency as requests per second per CPU microsecond."""
+    if cpu_us is None or rps is None or isinstance(cpu_us, bool) or isinstance(rps, bool):
+        return None
+    if not isinstance(cpu_us, (int, float)) or not isinstance(rps, (int, float)):
+        return None
+    if not math.isfinite(cpu_us) or not math.isfinite(rps) or cpu_us <= 0 or rps <= 0:
+        return None
+    return round(float(rps) / float(cpu_us), 2)
+
+
+def filter_top_tier(rows: list[dict], min_score: float = 80.0, max_p99_us: float | None = None) -> list[dict]:
+    """Filter rows meeting minimum quality score and optional tail latency SLA ceiling."""
+    if not isinstance(rows, list):
+        return []
+    if not isinstance(min_score, (int, float)) or isinstance(min_score, bool) or not math.isfinite(min_score):
+        min_score = 80.0
+    min_score = max(0.0, min(100.0, float(min_score)))
+
+    max_p99 = None
+    if max_p99_us is not None and isinstance(max_p99_us, (int, float)) and not isinstance(max_p99_us, bool) and math.isfinite(max_p99_us) and max_p99_us > 0:
+        max_p99 = float(max_p99_us)
+
+    filtered = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        score = float(r.get("score") or 0.0)
+        if score < min_score:
+            continue
+        if max_p99 is not None:
+            p99 = r.get("p99")
+            if p99 is None or float(p99) > max_p99:
+                continue
+        filtered.append(r)
+    return filtered
+
+
+def format_markdown_leaderboard(rows: list[dict], max_entries: int = 10) -> str:
+    """Format scored framework rows into a clean GitHub Flavored Markdown table."""
+    header = [
+        "| Rank | Framework | Score | RPS | Mean Latency | p99 Latency |",
+        "|---:|---|---:|---:|---:|---:|",
+    ]
+    if not isinstance(rows, list) or not rows:
+        return "\n".join(header) + "\n"
+    if not isinstance(max_entries, int) or isinstance(max_entries, bool) or max_entries <= 0:
+        max_entries = 10
+
+    lines = list(header)
+    for r in rows[:max_entries]:
+        if not isinstance(r, dict):
+            continue
+        rank = str(r.get("rank", "-"))
+        fw = str(r.get("framework") or r.get("fw") or "unknown")
+        score = f"{float(r['score']):.1f}" if isinstance(r.get("score"), (int, float)) else "-"
+        rps = f"{float(r['rps']):,.0f}" if isinstance(r.get("rps"), (int, float)) else "-"
+        mean = f"{float(r['mean']):.1f}µs" if isinstance(r.get("mean"), (int, float)) else "-"
+        p99 = f"{float(r['p99']):.1f}µs" if isinstance(r.get("p99"), (int, float)) else "-"
+        lines.append(f"| {rank} | {fw} | {score} | {rps} | {mean} | {p99} |")
+    return "\n".join(lines) + "\n"
+
+
 def _kv(path: Path) -> dict:
     out = {}
     try:
