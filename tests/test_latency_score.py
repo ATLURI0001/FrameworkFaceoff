@@ -23,6 +23,9 @@ from latency_score import (
     rank_rows,
     compute_relative_deltas,
     export_summary_json,
+    compute_efficiency_ratio,
+    filter_top_tier,
+    format_markdown_leaderboard,
     FULL_RATE,
     DEFAULT_PROFILE,
 )
@@ -324,6 +327,45 @@ class TestLatencyScore(unittest.TestCase):
         self.assertEqual(empty_summary["count"], 0)
         self.assertIsNone(empty_summary["topFramework"])
 
+    def test_compute_efficiency_ratio(self):
+        self.assertEqual(compute_efficiency_ratio(12.5, 950_000), 76000.0)
+        self.assertIsNone(compute_efficiency_ratio(None, 100))
+        self.assertIsNone(compute_efficiency_ratio(10, None))
+        self.assertIsNone(compute_efficiency_ratio(0, 100))
+        self.assertIsNone(compute_efficiency_ratio(10, 0))
+        self.assertIsNone(compute_efficiency_ratio(True, 100))
+        self.assertIsNone(compute_efficiency_ratio(10, False))
+
+    def test_filter_top_tier(self):
+        rows = [
+            {"framework": "fast", "score": 92.5, "p99": 150.0},
+            {"framework": "mid", "score": 82.0, "p99": 450.0},
+            {"framework": "slow", "score": 75.0, "p99": 600.0},
+        ]
+        # min_score = 80.0
+        top = filter_top_tier(rows, min_score=80.0)
+        self.assertEqual([r["framework"] for r in top], ["fast", "mid"])
+
+        # min_score = 80.0, max_p99_us = 300.0
+        strict = filter_top_tier(rows, min_score=80.0, max_p99_us=300.0)
+        self.assertEqual([r["framework"] for r in strict], ["fast"])
+
+        # Non-list safe fallback
+        self.assertEqual(filter_top_tier(None), [])
+
+    def test_format_markdown_leaderboard(self):
+        rows = [
+            {"rank": 1, "framework": "fast", "score": 95.0, "rps": 950000, "mean": 150.0, "p99": 300.0},
+            {"rank": 2, "framework": "mid", "score": 85.0, "rps": 800000, "mean": 250.0, "p99": 600.0},
+        ]
+        md = format_markdown_leaderboard(rows, max_entries=1)
+        self.assertIn("| Rank | Framework |", md)
+        self.assertIn("| 1 | fast | 95.0 | 950,000 | 150.0µs | 300.0µs |", md)
+        self.assertNotIn("mid", md)  # truncated by max_entries
+
+        # Empty fallback
+        empty_md = format_markdown_leaderboard([])
+        self.assertIn("| Rank | Framework |", empty_md)
 
 
 if __name__ == "__main__":
